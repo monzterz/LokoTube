@@ -341,18 +341,10 @@ fun SettingsScreen(
                         onClick = { openRepo(leplayRepo) },
                         padded = false,
                     )
-                    val telegram = "https://github.com/cnyel9"
-                    val openTelegram: () -> Unit = {
-                        val app = Intent(Intent.ACTION_VIEW, Uri.parse(telegram))
-                        val web = Intent(Intent.ACTION_VIEW, Uri.parse(telegram))
-                        runCatching { context.startActivity(app) }
-                            .onFailure { runCatching { context.startActivity(web) } }
-                    }
                     SettingsRow(
                         icon = Icons.Rounded.Person,
                         title = I18n.t("developer", "Developer"),
-                        subtitle = "Levi Setiadi (@cnyel9)",
-                        onClick = openTelegram,
+                        subtitle = "Levi Setiadi mod by Lokotre",
                         padded = false,
                     )
                     SettingsRow(
