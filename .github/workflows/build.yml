@@ -23,16 +23,17 @@ jobs:
           java-version: '21'
 
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Fix platform dir (android-37.0 vs android-37)
         shell: bash
         run: |
-          P="$ANDROID_HOME/platforms"
-          [ -d "$P/android-37.0" ] && [ ! -e "$P/android-37" ] && ln -sfn android-37.0 "$P/android-37" || true
-
-      - name: Write local.properties
-        run: echo "sdk.dir=$ANDROID_HOME" > local.properties
+          SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          echo "SDK=$SDK ANDROID_HOME=$ANDROID_HOME ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
+          SM=$(ls "$SDK/cmdline-tools/"*/bin/sdkmanager 2>/dev/null | sort | tail -1)
+          echo "sdkmanager=$SM"
+          yes | "$SM" --licenses >/dev/null 2>&1 || true
+          "$SM" "platforms;android-37" "build-tools;36.1.0" "platform-tools" >/dev/null 2>&1 || true
+          echo "sdk.dir=$SDK" > local.properties
+          P="$SDK/platforms"; [ -d "$P/android-37.0" ] && [ ! -e "$P/android-37" ] && ln -sfn android-37.0 "$P/android-37" || true
+          echo "=== platforms terpasang ==="; ls "$P" 2>/dev/null
 
       - name: Build debug APK
         run: |
