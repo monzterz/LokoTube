@@ -1,6 +1,6 @@
 <resources>
     <color name="ic_launcher_background">#0D9488</color>
-    <color name="brand">#D81E4A</color>
-    <color name="window_light">#FFF8F8</color>
-    <color name="window_dark">#140C0E</color>
+    <color name="brand">#0D9488</color>
+    <color name="window_light">#F2FAF8</color>
+    <color name="window_dark">#0A1416</color>
 </resources>

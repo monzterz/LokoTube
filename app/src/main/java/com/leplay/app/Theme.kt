@@ -106,11 +106,11 @@ object ThemeSettings {
 const val SEED_YOUTUBE = "#FF0033"
 
 private fun youTubeScheme(dark: Boolean): ColorScheme = if (!dark) lightColorScheme(
-    primary = Color(0xFFE6002E), onPrimary = Color.White,
-    primaryContainer = Color(0xFFFFE3E8), onPrimaryContainer = Color(0xFF5C0012),
+    primary = Color(0xFF0D9488), onPrimary = Color.White,
+    primaryContainer = Color(0xFFB8F0E6), onPrimaryContainer = Color(0xFF00332C),
     secondary = Color(0xFF606060), onSecondary = Color.White,
     secondaryContainer = Color(0xFFE0E0E0), onSecondaryContainer = Color(0xFF0F0F0F),
-    tertiary = Color(0xFFE6002E), tertiaryContainer = Color(0xFFF2F2F2), onTertiaryContainer = Color(0xFF0F0F0F),
+    tertiary = Color(0xFF0EA5E9), tertiaryContainer = Color(0xFFCDEBFA), onTertiaryContainer = Color(0xFF083344),
     background = Color.White, onBackground = Color(0xFF0F0F0F),
     surface = Color.White, onSurface = Color(0xFF0F0F0F),
     surfaceVariant = Color(0xFFE5E5E5), onSurfaceVariant = Color(0xFF606060),
@@ -119,11 +119,11 @@ private fun youTubeScheme(dark: Boolean): ColorScheme = if (!dark) lightColorSch
     surfaceContainerHighest = Color(0xFFE0E0E0),
     outline = Color(0xFF909090), outlineVariant = Color(0xFFE5E5E5),
 ) else darkColorScheme(
-    primary = Color(0xFFFF0033), onPrimary = Color.White,
-    primaryContainer = Color(0xFF4A0010), onPrimaryContainer = Color(0xFFFFD9DF),
+    primary = Color(0xFF2DD4BF), onPrimary = Color(0xFF00332C),
+    primaryContainer = Color(0xFF0E4F46), onPrimaryContainer = Color(0xFFA7F3EA),
     secondary = Color(0xFFAAAAAA), onSecondary = Color(0xFF0F0F0F),
     secondaryContainer = Color(0xFF3F3F3F), onSecondaryContainer = Color(0xFFF1F1F1),
-    tertiary = Color(0xFFFF4E45), tertiaryContainer = Color(0xFF272727), onTertiaryContainer = Color(0xFFF1F1F1),
+    tertiary = Color(0xFF38BDF8), tertiaryContainer = Color(0xFF0C3A4F), onTertiaryContainer = Color(0xFFBFE9FF),
     background = Color(0xFF0F0F0F), onBackground = Color(0xFFF1F1F1),
     surface = Color(0xFF0F0F0F), onSurface = Color(0xFFF1F1F1),
     surfaceVariant = Color(0xFF272727), onSurfaceVariant = Color(0xFFAAAAAA),

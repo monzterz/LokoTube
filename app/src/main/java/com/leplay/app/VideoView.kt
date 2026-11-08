@@ -1715,7 +1715,7 @@ fun MorphPlayButton(
     }
 }
 
-private val ScrubberActiveRed = Color(0xFFFF0033)
+private val ScrubberActiveRed = Color(0xFF2DD4BF)
 
 
 internal val EdgeScrubTouchPadAbove = 14.dp

@@ -915,17 +915,17 @@ private fun SupportDeveloperContent() {
         DonationCard(
             iconRes = R.drawable.dana,
             name = "DANA",
-            number = "0831-5475-6450",
-            holder = "Levi Setiadi",
-            onCopy = { copyDonationNumber(context, "083154756450") },
+            number = "0856-8560-110",
+            holder = "Rizal",
+            onCopy = { copyDonationNumber(context, "08568560110") },
         )
         Spacer(Modifier.height(10.dp))
         DonationCard(
-            iconRes = R.drawable.seabank,
-            name = "SeaBank",
-            number = "901587956054",
-            holder = "Levi Setiadi",
-            onCopy = { copyDonationNumber(context, "901587956054") },
+            iconRes = R.drawable.superbank,
+            name = "Superbank",
+            number = "000009973561",
+            holder = "Rizal",
+            onCopy = { copyDonationNumber(context, "000009973561") },
         )
         Spacer(Modifier.height(10.dp))
         Text(
