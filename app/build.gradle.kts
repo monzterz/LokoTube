@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.plugin.compose")
@@ -12,17 +14,26 @@ android {
         minSdk = 24
         targetSdk = 36
         versionCode = 1
-        versionName = "0.1.0-awal"
+        versionName = "0.1.0"
     }
 
     signingConfigs {
         create("release") {
+            val props = Properties()
+            val propsFile = file("keystore.properties")
+            if (propsFile.exists()) propsFile.inputStream().use { props.load(it) }
             val keystoreFile = file("release.keystore")
             if (keystoreFile.exists()) {
                 storeFile = keystoreFile
-                storePassword = System.getenv("KEYSTORE_PASSWORD") ?: "android"
-                keyAlias = System.getenv("KEY_ALIAS") ?: "androiddebugkey"
-                keyPassword = System.getenv("KEY_PASSWORD") ?: "android"
+                storePassword = props.getProperty("storePassword")
+                    ?: System.getenv("KEYSTORE_PASSWORD")
+                    ?: "android"
+                keyAlias = props.getProperty("keyAlias")
+                    ?: System.getenv("KEY_ALIAS")
+                    ?: "lokotube"
+                keyPassword = props.getProperty("keyPassword")
+                    ?: System.getenv("KEY_PASSWORD")
+                    ?: storePassword
                 enableV1Signing = true
                 enableV2Signing = true
                 enableV3Signing = true
