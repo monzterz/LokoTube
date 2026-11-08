@@ -1,24 +1,26 @@
 <div align="center">
 
-# LePlay
+# LokoTube
 
-<img src="docs/icon.png" width="200" alt="LePlay Icon" />
+<img src="docs/icon.png" width="200" alt="LokoTube Icon" />
 
 <br/>
 
 **A lightweight YouTube and YouTube Music client with a modern Liquid Glass UI, ad-free playback, synced lyrics, and high-quality downloads for Android phones, tablets, and TV.**
 
-[![Version](https://img.shields.io/github/v/release/cnyel9/leplay?style=flat-square&logo=android&logoColor=white&label=Version&color=E50914)](https://github.com/cnyel9/leplay/releases/latest)
-[![Android](https://img.shields.io/badge/Android-7.0%2B-3DDC84?style=flat-square&logo=android&logoColor=white)](https://github.com/cnyel9/leplay/releases/latest)
+[![Version](https://img.shields.io/github/v/release/monzterz/LokoTube?style=flat-square&logo=android&logoColor=white&label=Version&color=0D9488)](https://github.com/monzterz/LokoTube/releases/latest)
+[![Android](https://img.shields.io/badge/Android-7.0%2B-3DDC84?style=flat-square&logo=android&logoColor=white)](https://github.com/monzterz/LokoTube/releases/latest)
 [![License: GPL-3.0](https://img.shields.io/badge/License-GPLv3-blue.svg?style=flat-square)](LICENSE)
 
 <br/>
 
-[**Download Latest APK**](https://github.com/cnyel9/leplay/releases/latest)
+[**Download Latest APK**](https://github.com/monzterz/LokoTube/releases/latest)
 
 </div>
 
 ---
+
+> **LokoTube is a fork of [LePlay](https://github.com/cnyel9/leplay) by [Levi Setiadi (@cnyel9)](https://github.com/cnyel9), continued and developed independently. The original author is credited below.**
 
 ## Features
 
@@ -38,15 +40,15 @@
 
 ## Download
 
-[**Download Latest APK (v0.0.6-test1)**](https://github.com/cnyel9/leplay/releases/latest)
+[**Download Latest APK**](https://github.com/monzterz/LokoTube/releases/latest)
 
-> **Version 0.0.6-test1** · Android 7.0+ · One universal APK for phones, tablets, and Android TV.
+> Android 7.0+ · One universal APK for phones, tablets, and Android TV.
 
 ---
 
 ## Disclaimer
 
-LePlay is an independent, open-source project and is **not affiliated with or endorsed by Google LLC or YouTube**. All content is streamed directly from YouTube's servers for personal, educational use. Provided "as is" under the GPL-3.0 license without warranty; users are responsible for complying with YouTube's Terms of Service and applicable copyright laws.
+LokoTube is an independent, open-source project and is **not affiliated with or endorsed by Google LLC or YouTube**. All content is streamed directly from YouTube's servers for personal, educational use. Provided "as is" under the GPL-3.0 license without warranty; users are responsible for complying with YouTube's Terms of Service and applicable copyright laws.
 
 ---
 
@@ -62,4 +64,6 @@ The release APK is written to `app/build/outputs/apk/release/app-release.apk`.
 
 ## License
 
-Copyright (C) 2026 Levi Setiadi ([@cnyel9](https://github.com/cnyel9)). Licensed under GPLv3. See [LICENSE](LICENSE) and [COPYRIGHT](COPYRIGHT).
+Original code Copyright (C) 2026 [Levi Setiadi (@cnyel9)](https://github.com/cnyel9). Licensed under GPLv3. See [LICENSE](LICENSE) and [COPYRIGHT](COPYRIGHT).
+
+LokoTube modifications are also licensed under GPL-3.0.

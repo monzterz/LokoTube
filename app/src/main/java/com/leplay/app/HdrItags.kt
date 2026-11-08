@@ -13,7 +13,7 @@ import org.schabi.newpipe.extractor.services.youtube.ItagItem
  */
 object HdrItags {
 
-    private const val TAG = "LePlay"
+    private const val TAG = "LokoTube"
 
     private data class Hdr(val id: Int, val height: Int, val fps: Int, val codec: String, val bitrate: Int)
 

@@ -48,7 +48,7 @@ object SharedVideoTexture {
         } else if (kept !== fresh) {
 
             runCatching { view.setSurfaceTexture(kept) }
-                .onFailure { Log.w("LePlay", "couldn't re-attach the video texture", it) }
+                .onFailure { Log.w("LokoTube", "couldn't re-attach the video texture", it) }
         }
     }
 }

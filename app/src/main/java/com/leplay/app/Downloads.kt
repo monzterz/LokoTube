@@ -156,7 +156,7 @@ object Downloads {
 
     fun defaultDownloadDir(): File {
         val pubDownloads = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-        return File(pubDownloads, "LePlay Downloads")
+        return File(pubDownloads, "LokoTube Downloads")
     }
 
     fun init(context: Context) {

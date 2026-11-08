@@ -263,7 +263,7 @@ fun SettingsScreen(
                     SettingsRow(
                         icon = Icons.Rounded.DataUsage,
                         title = I18n.t("storage_usage", "Storage Usage"),
-                        subtitle = I18n.t("storage_sub", "See phone storage & clear LePlay cache"),
+                        subtitle = I18n.t("storage_sub", "See phone storage & clear LokoTube cache"),
                         onClick = { activeFloatingSection = SettingsFloatingSection.STORAGE_USAGE },
                         padded = false,
                     )
@@ -274,7 +274,7 @@ fun SettingsScreen(
                     SettingsRow(
                         icon = Icons.Rounded.Info,
                         title = I18n.t("version", "Version"),
-                        subtitle = "LePlay ${BuildConfig.VERSION_NAME}",
+                        subtitle = "LokoTube ${BuildConfig.VERSION_NAME}",
                         padded = false,
                         trailing = {
                             Box(
@@ -333,7 +333,7 @@ fun SettingsScreen(
                             context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
                         }
                     }
-                    val leplayRepo = "https://github.com/cnyel9/leplay"
+                    val leplayRepo = "https://github.com/monzterz/LokoTube"
                     SettingsRow(
                         icon = Icons.Rounded.Code,
                         title = I18n.t("open_source", "Open Source"),
@@ -411,7 +411,7 @@ fun SettingsScreen(
                 SettingsFloatingSection.STORAGE_USAGE -> {
                     SettingsFloatingDialog(
                         title = I18n.t("storage_usage", "Storage Usage"),
-                        subtitle = I18n.t("storage_sub", "Device memory & LePlay data"),
+                        subtitle = I18n.t("storage_sub", "Device memory & LokoTube data"),
                         onDismiss = { activeFloatingSection = null },
                     ) {
                         StorageUsageContent(context = context) {
@@ -864,7 +864,7 @@ private fun VersionHistoryContent() {
                 Column(Modifier.padding(vertical = 8.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            "LePlay $version",
+                            "LokoTube $version",
                             fontFamily = RoundedHeavy, fontWeight = FontWeight.ExtraBold,
                             fontSize = 16.sp, color = c.onSurface,
                             modifier = Modifier.weight(1f),
@@ -915,7 +915,7 @@ private fun SupportDeveloperContent() {
     val context = LocalContext.current
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(
-            I18n.t("support_body", "LePlay is free, with no ads. If it makes your day a little better, a voluntary coffee keeps development going. Thank you!"),
+            I18n.t("support_body", "LokoTube is free, with no ads. If it makes your day a little better, a voluntary coffee keeps development going. Thank you!"),
             fontSize = 13.5.sp, lineHeight = 19.sp,
             color = c.onSurface.copy(alpha = 0.92f),
         )
@@ -946,7 +946,7 @@ private fun SupportDeveloperContent() {
 private fun copyDonationNumber(context: Context, number: String) {
     runCatching {
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-        clipboard.setPrimaryClip(android.content.ClipData.newPlainText("LePlay", number))
+        clipboard.setPrimaryClip(android.content.ClipData.newPlainText("LokoTube", number))
         android.widget.Toast.makeText(context, I18n.t("copied", "Copied"), android.widget.Toast.LENGTH_SHORT).show()
     }
 }
@@ -1351,7 +1351,7 @@ private fun DownloadFolderSelectionDialog(
                     Spacer(Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "Download/LePlay Downloads",
+                            text = "Download/LokoTube Downloads",
                             fontWeight = if (isDefault) FontWeight.SemiBold else FontWeight.Medium,
                             fontSize = 13.sp,
                             color = if (isDefault) c.primary else c.onSurface,
@@ -1367,7 +1367,7 @@ private fun DownloadFolderSelectionDialog(
 
                 Spacer(Modifier.height(6.dp))
 
-                val musicDir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC), "LePlay").absolutePath
+                val musicDir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC), "LokoTube").absolutePath
                 val isMusic = currentPath == musicDir
                 Row(
                     modifier = Modifier
@@ -1387,7 +1387,7 @@ private fun DownloadFolderSelectionDialog(
                     Spacer(Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "Music/LePlay",
+                            text = "Music/LokoTube",
                             fontWeight = if (isMusic) FontWeight.SemiBold else FontWeight.Medium,
                             fontSize = 13.sp,
                             color = if (isMusic) c.primary else c.onSurface,
@@ -1469,7 +1469,7 @@ private fun GeneralModificationContent(context: Context) {
             val path = if (docId.startsWith("primary:")) {
                 File(Environment.getExternalStorageDirectory(), docId.removePrefix("primary:"))
             } else {
-                File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "LePlay Downloads")
+                File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "LokoTube Downloads")
             }
             Downloads.setCustomDownloadDir(path)
         }
@@ -1688,7 +1688,7 @@ private fun GeneralModificationContent(context: Context) {
                 showFolderDialog = false
             },
             onSelectMusic = {
-                val musicDir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC), "LePlay")
+                val musicDir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC), "LokoTube")
                 Downloads.setCustomDownloadDir(musicDir)
                 showFolderDialog = false
             },
@@ -1877,7 +1877,7 @@ private fun StorageUsageContent(context: Context, onCacheCleared: () -> Unit) {
 
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                text = I18n.t("used_by_leplay", "Used by LePlay"),
+                text = I18n.t("used_by_leplay", "Used by LokoTube"),
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 14.sp,
                 color = c.onSurface,
@@ -1955,7 +1955,7 @@ private fun StorageUsageContent(context: Context, onCacheCleared: () -> Unit) {
                 }
                 Spacer(Modifier.width(6.dp))
                 Text(
-                    text = clearedNotice ?: I18n.t("clear_cache_downloads", "Clear LePlay Cache & Downloads"),
+                    text = clearedNotice ?: I18n.t("clear_cache_downloads", "Clear LokoTube Cache & Downloads"),
                     color = Color(0xFFEF5350),
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 12.5.sp,

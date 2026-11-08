@@ -897,7 +897,7 @@ object InnerTube {
             val url = "https://lrclib.net/api/get?track_name=$encT&artist_name=$encA"
             val req = Request.Builder()
                 .url(url)
-                .header("User-Agent", "LePlay/1.1 (https://github.com/cnyel9/leplay)")
+                .header("User-Agent", "LokoTube/1.1 (https://github.com/monzterz/LokoTube)")
                 .build()
             Net.client.newCall(req).execute().use { r ->
                 if (r.isSuccessful) {
@@ -965,7 +965,7 @@ object InnerTube {
                 java.net.URLEncoder.encode("$cleanTitle $cleanArtist", "UTF-8")
             val searchReq = Request.Builder()
                 .url(searchUrl)
-                .header("User-Agent", "LePlay/1.1 (https://github.com/cnyel9/leplay)")
+                .header("User-Agent", "LokoTube/1.1 (https://github.com/monzterz/LokoTube)")
                 .build()
             Net.client.newCall(searchReq).execute().use { r ->
                 if (!r.isSuccessful) return@runCatching

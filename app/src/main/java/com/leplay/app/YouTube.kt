@@ -419,7 +419,7 @@ object YouTube {
 
         is ContentNotAvailableException ->
             if (t.message.orEmpty().contains("member", ignoreCase = true) || t is org.schabi.newpipe.extractor.exceptions.PaidContentException)
-                I18n.t("err_members_only", "This is a members-only video. LePlay can't play members-only videos yet.")
+                I18n.t("err_members_only", "This is a members-only video. LokoTube can't play members-only videos yet.")
             else I18n.t("err_video_unavailable", "This video isn't available.")
         is ReCaptchaException -> I18n.t("err_rate_limited", "YouTube is rate-limiting requests right now. Try again in a minute.")
         is IOException -> I18n.t("err_no_connection", "Couldn't reach YouTube. Check your connection.")

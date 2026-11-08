@@ -12,7 +12,7 @@ import androidx.compose.ui.platform.LocalContext
 /**
  * Voice search via the system speech recognizer (ACTION_RECOGNIZE_SPEECH).
  * The recognizer app owns the microphone and its RECORD_AUDIO permission,
- * so LePlay needs neither the permission nor a speech dependency. When no
+ * so LokoTube needs neither the permission nor a speech dependency. When no
  * recognizer is installed (common on de-Googled TVs) the returned action
  * shows a toast instead of failing silently.
  *

@@ -1399,7 +1399,7 @@ fun BitChordMusicPlayer(
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Text(
-                        "LEPLAY MUSIC",
+                        "LOKOTUBE MUSIC",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 1.2.sp,

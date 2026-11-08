@@ -269,12 +269,12 @@ private class StreamRecoverer(
         val id = item.mediaId
         val position = player.currentPosition
         if (id == lastId && position < lastPositionMs + PROGRESS_MS) {
-            Log.w("LePlay", "stream refused again for $id at ${position / 1000}s; giving up")
+            Log.w("LokoTube", "stream refused again for $id at ${position / 1000}s; giving up")
             return
         }
         lastId = id
         lastPositionMs = position
-        Log.i("LePlay", "stream refused for $id; re-extracting and resuming at ${position / 1000}s")
+        Log.i("LokoTube", "stream refused for $id; re-extracting and resuming at ${position / 1000}s")
         StreamRecovery.failed = null
         StreamRecovery.recovering = id
         StreamCache.invalidate(id)
@@ -287,7 +287,7 @@ private class StreamRecoverer(
                 result
                     .onSuccess { resume(item, position) }
                     .onFailure {
-                        Log.w("LePlay", "re-extracting $id failed", it)
+                        Log.w("LokoTube", "re-extracting $id failed", it)
                         StreamRecovery.failed = id to YouTube.friendlyError(it)
                     }
             }
@@ -345,7 +345,7 @@ private class WatchTimeReporter(private val player: ExoPlayer) : Player.Listener
         if (player.isPlaying) startStretch()
         io.execute {
             val started = runCatching { InnerTube.startWatch(id) }
-                .onFailure { Log.w("LePlay", "watch start for $id", it) }.getOrNull()
+                .onFailure { Log.w("LokoTube", "watch start for $id", it) }.getOrNull()
             main.post { if (videoId == id) session = started }
         }
     }
@@ -417,7 +417,7 @@ private class WatchTimeReporter(private val player: ExoPlayer) : Player.Listener
         starts.clear(); ends.clear()
         io.execute {
             runCatching { InnerTube.pingWatchtime(s, position, st, et, playing, elapsed, final) }
-                .onFailure { Log.w("LePlay", "watch time for ${s.videoId}", it) }
+                .onFailure { Log.w("LokoTube", "watch time for ${s.videoId}", it) }
         }
     }
 
@@ -479,7 +479,7 @@ private class SponsorSkipper(private val player: ExoPlayer) : Player.Listener {
         if (!SponsorBlock.enabled || segment.action != SponsorBlock.Action.Auto) return
         if (player.currentMediaItem?.mediaId != videoId) return
         if (player.currentPosition > segment.endMs - 500) return
-        Log.i("LePlay", "SponsorBlock: skipping ${segment.category.key} ${segment.startMs}-${segment.endMs} in $videoId")
+        Log.i("LokoTube", "SponsorBlock: skipping ${segment.category.key} ${segment.startMs}-${segment.endMs} in $videoId")
         ramp(from = 1f, to = 0f, durationMs = 300) {
             player.seekTo(segment.endMs)
             SponsorBlock.lastSkip = SponsorBlock.Skip(videoId, segment)
@@ -537,7 +537,7 @@ private class YouTubeMediaSourceFactory(context: Context) : MediaSource.Factory 
         // track, so using it for normal videos silently ignored both the picked language and the
         // picked quality. VOD goes through the generated DASH/progressive path below.
         if (isLive && !hlsUrl.isNullOrBlank()) {
-            Log.i("LePlay", "media source ${mediaItem.mediaId}: playing live HLS stream from $hlsUrl")
+            Log.i("LokoTube", "media source ${mediaItem.mediaId}: playing live HLS stream from $hlsUrl")
             return HlsMediaSource.Factory(dataSourceFactory).createMediaSource(
                 MediaItem.Builder()
                     .setUri(hlsUrl)
@@ -550,7 +550,7 @@ private class YouTubeMediaSourceFactory(context: Context) : MediaSource.Factory 
 
         // Nothing separable or muxed was extracted: HLS is still better than a black screen.
         if (picked.video == null && picked.muxed == null && !hlsUrl.isNullOrBlank()) {
-            Log.i("LePlay", "media source ${mediaItem.mediaId}: no progressive streams, falling back to HLS")
+            Log.i("LokoTube", "media source ${mediaItem.mediaId}: no progressive streams, falling back to HLS")
             return HlsMediaSource.Factory(dataSourceFactory).createMediaSource(
                 MediaItem.Builder()
                     .setUri(hlsUrl)
@@ -563,12 +563,12 @@ private class YouTubeMediaSourceFactory(context: Context) : MediaSource.Factory 
         if (QualityPreference.height == null && picked.audio != null) {
             val adaptive = adaptiveVideo(info, mediaItem)
             if (adaptive != null) {
-                Log.i("LePlay", "media source ${mediaItem.mediaId}: adaptive video up to ${NetworkSpeed.linkHeight()}p + audio itag ${picked.audio.itag}")
+                Log.i("LokoTube", "media source ${mediaItem.mediaId}: adaptive video up to ${NetworkSpeed.linkHeight()}p + audio itag ${picked.audio.itag}")
                 return MergingMediaSource(true, true, adaptive, source(picked.audio, info.duration, mediaItem))
             }
         }
         Log.i(
-            "LePlay",
+            "LokoTube",
             "media source ${mediaItem.mediaId}: " + if (picked.usesSeparate) "video itag ${picked.video?.itag} (${picked.video?.height}p) + audio itag ${picked.audio?.itag}"
             else "combined fallback itag ${picked.muxed?.itag} (${picked.muxed?.height}p); video=${picked.video != null} audio=${picked.audio != null}; " +
                 "audio offered: " + info.audioStreams.joinToString { "${it.itag}/${it.format}/${it.deliveryMethod}/url=${it.isUrl}/${it.audioTrackType}" },

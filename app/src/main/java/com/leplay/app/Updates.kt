@@ -104,9 +104,9 @@ class ReleaseHistoryException(val detail: String, cause: Throwable? = null) :
 suspend fun fetchReleaseHistory(): List<ReleaseEntry> = withContext(Dispatchers.IO) {
     try {
         val request = Request.Builder()
-            .url("https://api.github.com/repos/cnyel9/leplay/releases?per_page=100")
+            .url("https://api.github.com/repos/monzterz/LokoTube/releases?per_page=100")
             .header("Accept", "application/vnd.github+json")
-            .header("User-Agent", "LePlay/${BuildConfig.VERSION_NAME}")
+            .header("User-Agent", "LokoTube/${BuildConfig.VERSION_NAME}")
             .build()
         Net.client.newCall(request).execute().use { response ->
             val bodyText = response.body?.string().orEmpty()
@@ -156,8 +156,8 @@ suspend fun fetchReleaseHistory(): List<ReleaseEntry> = withContext(Dispatchers.
  * newer than the latest published release). Keep this in sync with the build.
  */
 internal val RELEASE_NOTES = """
-    • LePlay 0.0.6 test-1: channel Live tab gets Latest / Popular / Oldest sort chips with full paging, and video rows now show the view count together with the upload time in every language.
-    • LePlay 0.0.5: Indonesian is now the default language with the full interface translated, video descriptions can be selected and copied, and viewer counts use Indonesian formatting (rb, jt, M).
+    • LokoTube 0.0.6 test-1: channel Live tab gets Latest / Popular / Oldest sort chips with full paging, and video rows now show the view count together with the upload time in every language.
+    • LokoTube 0.0.5: Indonesian is now the default language with the full interface translated, video descriptions can be selected and copied, and viewer counts use Indonesian formatting (rb, jt, M).
     • Ad-free YouTube and YouTube Music playback with a Liquid Glass UI.
     • Personalised Shorts feed, synced lyrics, and high-quality downloads up to 4K HDR.
     • Background playback, Picture-in-Picture, and Android TV mode.
@@ -239,7 +239,7 @@ class UpdateState(private val scope: CoroutineScope) {
     fun install(context: Context) {
         val file = downloaded ?: return
         if (Build.VERSION.SDK_INT >= 26 && !context.packageManager.canRequestPackageInstalls()) {
-            error = I18n.t("update_allow_installs", "Allow installs from LePlay, then tap Install again.")
+            error = I18n.t("update_allow_installs", "Allow installs from LokoTube, then tap Install again.")
             runCatching {
                 context.startActivity(
                     Intent(
@@ -269,9 +269,9 @@ class UpdateState(private val scope: CoroutineScope) {
 
     private fun fetchLatest(): UpdateInfo? {
         val request = Request.Builder()
-            .url("https://api.github.com/repos/cnyel9/leplay/releases/latest")
+            .url("https://api.github.com/repos/monzterz/LokoTube/releases/latest")
             .header("Accept", "application/vnd.github+json")
-            .header("User-Agent", "LePlay/${BuildConfig.VERSION_NAME}")
+            .header("User-Agent", "LokoTube/${BuildConfig.VERSION_NAME}")
             .build()
         Net.client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) return null
@@ -288,11 +288,11 @@ class UpdateState(private val scope: CoroutineScope) {
                 if (!name.endsWith(".apk", ignoreCase = true)) continue
                 val candidate = asset.optString("browser_download_url")
                 if (candidate.isBlank()) continue
-                if (apkUrl == null || name.equals("LePlay.apk", ignoreCase = true)) {
+                if (apkUrl == null || name.equals("LokoTube.apk", ignoreCase = true)) {
                     apkUrl = candidate
                     size = asset.optLong("size")
                 }
-                if (name.equals("LePlay.apk", ignoreCase = true)) break
+                if (name.equals("LokoTube.apk", ignoreCase = true)) break
             }
             val url = apkUrl ?: return null
             return UpdateInfo(
@@ -312,11 +312,11 @@ class UpdateState(private val scope: CoroutineScope) {
         onProgress: (Float) -> Unit,
     ): File {
         val dir = File(context.cacheDir, "updates").apply { mkdirs() }
-        val target = File(dir, "LePlay.apk")
+        val target = File(dir, "LokoTube.apk")
         if (target.exists()) target.delete()
         val request = Request.Builder()
             .url(update.apkUrl)
-            .header("User-Agent", "LePlay/${BuildConfig.VERSION_NAME}")
+            .header("User-Agent", "LokoTube/${BuildConfig.VERSION_NAME}")
             .build()
         Net.client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) error("HTTP ${response.code}")
@@ -452,7 +452,7 @@ fun UpdateOverlay(state: UpdateState, backdrop: Backdrop) {
                                 fontWeight = FontWeight.Bold,
                             )
                             Text(
-                                "LePlay ${update?.version.orEmpty()}" +
+                                "LokoTube ${update?.version.orEmpty()}" +
                                     formatUpdateSize(update?.sizeBytes ?: 0L).let { if (it.isBlank()) "" else " · $it" },
                                 color = c.onSurfaceVariant,
                                 fontSize = 12.5.sp,
@@ -503,7 +503,7 @@ fun UpdateOverlay(state: UpdateState, backdrop: Backdrop) {
                             .clip(RoundedCornerShape(8.dp))
                             .pressable {
                                 val url = update?.htmlUrl?.ifBlank { null }
-                                    ?: "https://github.com/cnyel9/leplay/releases/tag/${update?.tag.orEmpty()}"
+                                    ?: "https://github.com/monzterz/LokoTube/releases/tag/${update?.tag.orEmpty()}"
                                 runCatching {
                                     context.startActivity(
                                         android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url)),
@@ -536,7 +536,7 @@ fun UpdateOverlay(state: UpdateState, backdrop: Backdrop) {
                         )
                         Spacer(Modifier.height(7.dp))
                         Text(
-                            I18n.t("update_downloading", "{percent}% · downloading LePlay.apk").replace("{percent}", "${(state.progress * 100).toInt()}"),
+                            I18n.t("update_downloading", "{percent}% · downloading LokoTube.apk").replace("{percent}", "${(state.progress * 100).toInt()}"),
                             color = c.onSurfaceVariant,
                             fontSize = 11.5.sp,
                             fontWeight = FontWeight.Medium,

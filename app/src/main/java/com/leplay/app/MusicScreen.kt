@@ -577,7 +577,7 @@ private fun MusicScreenHeader(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            text = "LePlay Music",
+            text = "LokoTube Music",
             modifier = Modifier.weight(1f),
             fontFamily = RoundedHeavy,
             fontWeight = FontWeight.Bold,

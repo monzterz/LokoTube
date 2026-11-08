@@ -29,7 +29,7 @@ import java.util.concurrent.TimeUnit
  */
 object HdrFormats {
 
-    private const val TAG = "LePlay"
+    private const val TAG = "LokoTube"
     private const val MAX_AGE_MS = 45 * 60 * 1000L
     private const val EMPTY_AGE_MS = 10 * 60 * 1000L
     private const val WAIT_MS = 2_500L

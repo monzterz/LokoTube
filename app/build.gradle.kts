@@ -8,11 +8,11 @@ android {
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "com.leplay.app"
+        applicationId = "com.lokotube.app"
         minSdk = 24
         targetSdk = 36
-        versionCode = 125
-        versionName = "0.0.8-test3"
+        versionCode = 1
+        versionName = "0.1.0-awal"
     }
 
     signingConfigs {

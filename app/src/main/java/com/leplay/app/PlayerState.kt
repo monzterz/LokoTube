@@ -1734,4 +1734,4 @@ fun rememberPlayerState(): PlayerState {
 
 enum class PlayerSheet { Quality, Comments, Queue, Settings, Speed, Audio, Subtitles }
 
-private const val TAG = "LePlay"
+private const val TAG = "LokoTube"
