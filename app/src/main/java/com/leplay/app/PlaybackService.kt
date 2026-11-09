@@ -144,6 +144,11 @@ class PlaybackService : MediaSessionService() {
                 }
             }
         })
+        player.addListener(object : androidx.media3.common.Player.Listener {
+            override fun onAudioSessionIdChanged(audioSessionId: Int) {
+                AudioEffects.attach(audioSessionId)
+            }
+        })
         session = MediaSession.Builder(this, notificationPlayer(player))
             .setSessionActivity(openApp)
             .setCallback(SessionCallback())

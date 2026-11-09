@@ -724,7 +724,7 @@ private fun EqualizerContent() {
     val c = MaterialTheme.colorScheme
     val names = remember { AudioEffects.presetNames() }
     val current = AudioEffects.presetIndex
-    val boost = AudioEffects.boostPercent
+    val boostLive = remember { mutableStateOf(AudioEffects.boostPercent.toFloat()) }
     val all = listOf(I18n.t("eq_off", "Nonaktif (suara asli)")) + names
     Column(Modifier.padding(vertical = 8.dp)) {
         Column(Modifier.padding(horizontal = 20.dp)) {
@@ -737,15 +737,16 @@ private fun EqualizerContent() {
                     fontWeight = FontWeight.SemiBold,
                 )
                 Text(
-                    "$boost%",
+                    "${boostLive.value.toInt()}%",
                     color = c.primary,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.SemiBold,
                 )
             }
             Slider(
-                value = boost.toFloat(),
-                onValueChange = { f -> AudioEffects.setBoost(f.toInt()) },
+                value = boostLive.value,
+                onValueChange = { boostLive.value = it },
+                onValueChangeFinished = { AudioEffects.setBoost(boostLive.value.toInt()) },
                 valueRange = 0f..100f,
             )
         }

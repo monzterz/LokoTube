@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.media.audiofx.Equalizer
 import android.media.audiofx.LoudnessEnhancer
+import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -22,7 +23,8 @@ object AudioEffects {
     private const val PREFS = "audio_effects"
     private const val KEY_PRESET = "eq_preset"
     private const val KEY_BOOST = "volume_boost"
-    private const val MAX_BOOST_MB = 6000
+    private const val MAX_BOOST_MB = 2000 // 100 mB = 1 dB; 2000 mB = +20 dB
+    private const val TAG = "AudioFX"
 
     /** 5-band gain curves in dB (bass → treble). */
     private val PRESETS = listOf(
@@ -58,6 +60,7 @@ object AudioEffects {
     fun presetNames(): List<String> = PRESETS.map { it.first }
 
     fun attach(audioSessionId: Int) {
+        Log.d(TAG, "attach session=$audioSessionId")
         sessionId = audioSessionId
         attachEqualizer()
         attachBooster()
@@ -71,7 +74,8 @@ object AudioEffects {
             eq.enabled = true
             equalizer?.release()
             equalizer = eq
-        }
+            Log.d(TAG, "equalizer aktif bands=${eq.numberOfBands}")
+        }.onFailure { Log.w(TAG, "attachEqualizer gagal", it) }
     }
 
     fun setPreset(index: Int) {
@@ -89,12 +93,13 @@ object AudioEffects {
         runCatching {
             apply(eq, index - 1)
             eq.enabled = true
-        }
+        }.onFailure { Log.w(TAG, "setPreset gagal", it) }
     }
 
     fun setBoost(pct: Int) {
         boostPercent = pct.coerceIn(0, 100)
         prefs().edit().putInt(KEY_BOOST, boostPercent).apply()
+        Log.d(TAG, "setBoost $boostPercent% (session=$sessionId)")
         if (boostPercent <= 0) {
             releaseBooster()
             return
@@ -107,11 +112,13 @@ object AudioEffects {
         runCatching {
             b.setTargetGain(boostGainMB(boostPercent))
             b.enabled = true
-        }
+            Log.d(TAG, "setBoost ok targetGain=${b.targetGain} mB")
+        }.onFailure { Log.w(TAG, "setBoost gagal", it) }
     }
 
     private fun attachBooster() {
         if (sessionId <= 0 || boostPercent <= 0) {
+            Log.d(TAG, "attachBooster skip (session=$sessionId boost=$boostPercent)")
             releaseBooster()
             return
         }
@@ -121,7 +128,8 @@ object AudioEffects {
             le.enabled = true
             booster?.release()
             booster = le
-        }
+            Log.d(TAG, "booster aktif gain=${le.targetGain} mB")
+        }.onFailure { Log.w(TAG, "attachBooster gagal", it) }
     }
 
     private fun boostGainMB(pct: Int): Int =
