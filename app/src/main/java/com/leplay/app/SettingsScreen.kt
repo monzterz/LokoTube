@@ -895,6 +895,7 @@ private fun VersionHistoryContent() {
     // the release list from GitHub and force-closed when its LazyColumn was
     // measured inside the scrolling dialog. A static list cannot crash.
     val entries = listOf(
+        Triple("0.1.4", "9 Nov 2026", "Layar onboarding saat buka pertama (logo, fitur unggulan, pilih bahasa Indonesia/English). Serta perbaikan tampilan logo."),
         Triple("0.1.3", "9 Nov 2026", "Widget mini player (mundur/putar-jeda/maju/perluas/tutup), kontrol player tanpa delay (hapus jeda 1 detik tombol tengah), rapikan changelog."),
         Triple("0.1.2", "9 Nov 2026", "Chapter/titik waktu video, unduh massal (multi-select + peringatan ukuran), saklar radio/autoplay (putar satu lagu & berhenti), cari di dalam playlist, equalizer preset, form umpan-balik GitHub, sinkronisasi otomatis dengan versi sumber."),
         Triple("0.1.1", "9 Nov 2026", "Tema Flat Light, terjemahan Indonesia lengkap, impor/ekspor langganan (CSV) + playlist lokal (JSON), pemutar lebih responsif (tap langsung ke kontrol, pindah lagu instan lewat prefetch + pre-buffer audio)."),

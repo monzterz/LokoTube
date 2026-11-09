@@ -13,8 +13,8 @@ android {
         applicationId = "com.lokotube.app"
         minSdk = 24
         targetSdk = 36
-        versionCode = 4
-        versionName = "0.1.3"
+        versionCode = 5
+        versionName = "0.1.4"
     }
 
     signingConfigs {

@@ -18,3 +18,8 @@ CATATAN-PROYEK.md
 .idea/
 *.iml
 .DS_Store
+
+# Berkas pribadi — bukan bagian repo
+blast-wa.txt
+tokencodeberg.txt
+*codeberg*.txt
