@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">LokoTube</string>
+    <string name="widget_label">LokoTube mini player</string>
+    <string name="widget_desc">Kontrol musik cepat dari layar utama</string>
 </resources>

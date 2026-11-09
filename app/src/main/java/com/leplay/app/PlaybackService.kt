@@ -134,6 +134,16 @@ class PlaybackService : MediaSessionService() {
         player.addListener(StreamRecoverer(player, sources, resolver))
         resumeSaver = ResumeSaver(player).also(player::addListener)
         watchTime = WatchTimeReporter(player).also(player::addListener)
+        player.addListener(object : androidx.media3.common.Player.Listener {
+            override fun onEvents(player: androidx.media3.common.Player, events: androidx.media3.common.Player.Events) {
+                if (events.contains(androidx.media3.common.Player.EVENT_IS_PLAYING_CHANGED) ||
+                    events.contains(androidx.media3.common.Player.EVENT_MEDIA_METADATA_CHANGED) ||
+                    events.contains(androidx.media3.common.Player.EVENT_PLAYBACK_STATE_CHANGED)
+                ) {
+                    PlayerAppWidget.refresh(this@PlaybackService, player)
+                }
+            }
+        })
         session = MediaSession.Builder(this, notificationPlayer(player))
             .setSessionActivity(openApp)
             .setCallback(SessionCallback())
