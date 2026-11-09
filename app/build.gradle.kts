@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.leplay.app"
+    namespace = "com.lokotube.app"
     compileSdk = 37
 
     defaultConfig {

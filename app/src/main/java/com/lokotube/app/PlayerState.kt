@@ -1,0 +1,1777 @@
+package com.lokotube.app
+
+import android.content.ComponentName
+import android.util.Log
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.Stable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
+import androidx.core.net.toUri
+import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
+import androidx.media3.common.C
+import androidx.media3.common.PlaybackException
+import androidx.media3.common.Player
+import androidx.media3.common.VideoSize
+import androidx.media3.session.MediaController
+import kotlin.math.min
+import kotlin.math.roundToInt
+import androidx.media3.session.SessionToken
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+
+
+
+
+
+/** Where the current music queue came from; drives refill and the queue
+ *  panel's context line. */
+sealed interface MusicQueueSource {
+    data object None : MusicQueueSource
+    data object ListSource : MusicQueueSource
+    /** Loose surface (search, Listen Again, Liked, home direct tracks):
+     *  the tapped song plays, then its radio takes over the queue. */
+    data object LooseList : MusicQueueSource
+    /** Bound surface (playlist/album/channel opened via MusicMixScreen):
+     *  the list plays out first, then radio seeded from the last song. */
+    data object BoundList : MusicQueueSource
+    data class RadioSong(val seedId: String) : MusicQueueSource
+    data class RadioPlaylist(val playlistId: String) : MusicQueueSource
+}
+
+/** Same-process bridge so the playback service's ForwardingPlayer can route
+ *  notification next/previous actions into this state. The service and the
+ *  UI live in the same process, so plain volatile hooks are enough. */
+object PlayerNotificationHooks {
+    @Volatile var onNext: (() -> Unit)? = null
+    @Volatile var onPrevious: (() -> Unit)? = null
+}
+
+/** Same-process bridge so PlayerState can read a snapshot of the home
+ *  feed (FYP / subscriptions mix) for the displayed related list without
+ *  a layering dependency on LibraryData. Snapshot only: when the feed
+ *  was never loaded the provider returns an empty list and the related
+ *  list is shown as-is. */
+object HomeFeedHooks {
+    @Volatile var provider: (() -> List<VideoItem>)? = null
+}
+
+@Stable
+class PlayerState(private val scope: CoroutineScope) {
+    var controller by mutableStateOf<MediaController?>(null)
+        internal set
+
+
+    var current by mutableStateOf<VideoItem?>(null)
+        private set
+    var details by mutableStateOf<VideoDetails?>(null)
+        private set
+    var loading by mutableStateOf(false)
+        private set
+    var error by mutableStateOf<String?>(null)
+        private set
+
+    var isPlaying by mutableStateOf(false)
+        private set
+    var isBuffering by mutableStateOf(false)
+        private set
+    var positionMs by mutableLongStateOf(0L)
+        private set
+    var bufferedMs by mutableLongStateOf(0L)
+        private set
+    var durationMs by mutableLongStateOf(0L)
+        private set
+
+    var speed by mutableFloatStateOf(1f)
+        private set
+    var loopEnabled by mutableStateOf(false)
+        private set
+    var shuffleEnabled by mutableStateOf(false)
+        private set
+    var isMusicMode by mutableStateOf(false)
+    var autoPlayEnabled by mutableStateOf(true)
+        private set
+    var videoZoom by mutableFloatStateOf(1f)
+    var zoomToFill by mutableStateOf(false)
+
+    /** Stretch display mode (0.0.8-test3): the video fills the whole frame
+     *  with no crop and no bars, at the cost of aspect distortion. Mutually
+     *  exclusive with [zoomToFill]; the fullscreen button cycles
+     *  fit -> crop-fill -> stretch. */
+    var zoomStretch by mutableStateOf(false)
+
+    fun resetZoom() { videoZoom = 1f; zoomToFill = false; zoomStretch = false }
+
+    fun toggleZoomToFill() {
+        when {
+            zoomStretch -> {
+                zoomStretch = false
+                actionMessage = I18n.t("fit_to_screen", "Fit to screen")
+            }
+            zoomToFill -> {
+                zoomToFill = false
+                zoomStretch = true
+                actionMessage = I18n.t("stretched_to_fill", "Stretched to fill screen")
+            }
+            else -> {
+                zoomToFill = true
+                actionMessage = I18n.t("zoomed_to_fill", "Zoomed to fill screen")
+            }
+        }
+    }
+
+    fun toggleAutoPlay() {
+        autoPlayEnabled = !autoPlayEnabled
+        actionMessage = if (autoPlayEnabled) I18n.t("autoplay_on", "Autoplay on") else I18n.t("autoplay_off", "Autoplay off")
+    }
+
+    fun toggleShuffle() {
+        val player = controller ?: return
+        val next = !player.shuffleModeEnabled
+        player.shuffleModeEnabled = next
+        shuffleEnabled = next
+        actionMessage = if (shuffleEnabled) I18n.t("shuffle_on", "Shuffle on") else I18n.t("shuffle_off", "Shuffle off")
+    }
+
+    fun skipNext() {
+
+        if (isMusicMode && musicQueue.isNotEmpty()) {
+            consumeMusicHead()
+            return
+        }
+        if (!isMusicMode && queue.isNotEmpty()) {
+            playFromQueue(0)
+        } else {
+            autoPlayNext()
+        }
+    }
+
+    fun skipPrevious() {
+        val player = controller ?: return
+        if (player.currentPosition > 3000) {
+            player.seekTo(0)
+        } else {
+            player.seekTo(0)
+        }
+    }
+
+    fun hasNextVideo(): Boolean =
+        queue.isNotEmpty() || displayRelated.any { it.id != current?.id }
+
+    /** Next-video button: the play queue first, then the same up-next pick
+     *  autoplay would make. Video mode only; a live stream has no "next". */
+    fun nextVideo() {
+        if (isMusicMode) return
+        if (queue.isNotEmpty()) {
+            playFromQueue(0)
+            return
+        }
+        if (current?.isLive == true) return
+        autoPlayNext()
+    }
+
+    /** Previous-video button: restart the current video when well into it,
+     *  otherwise go back to the previously watched video. */
+    fun previousVideo() {
+        if (isMusicMode) return
+        if (current?.isLive == true) return
+        if (positionMs > 3000) {
+            seekTo(0L)
+            return
+        }
+        val prev = playedHistory.removeLastOrNull()
+        if (prev != null) {
+            historyNavInProgress = true
+            open(prev)
+        } else {
+            seekTo(0L)
+        }
+    }
+
+    fun toggleLoop() {
+        val player = controller ?: return
+        val next = if (player.repeatMode == Player.REPEAT_MODE_ONE) Player.REPEAT_MODE_OFF else Player.REPEAT_MODE_ONE
+        player.repeatMode = next
+        loopEnabled = next == Player.REPEAT_MODE_ONE
+        actionMessage = if (loopEnabled) I18n.t("loop_on", "Loop on") else I18n.t("loop_off", "Loop off")
+    }
+
+    /** Sleep timer (0.0.8-test2, user request): pauses playback when it
+     *  fires, for video and music alike since both share this state. The
+     *  selection cycles Off, 10, 20, 30, 45, 60 minutes from the settings
+     *  sheet; the countdown runs on this state's scope so it survives
+     *  sheet dismissals and keeps ticking in the background. */
+    var sleepTimerMinutes by mutableStateOf(0)
+        private set
+    var sleepRemainingMin by mutableStateOf(0)
+        private set
+    private var sleepJob: Job? = null
+
+    fun cycleSleepTimer() {
+        val options = listOf(0, 10, 20, 30, 45, 60)
+        val next = options[(options.indexOf(sleepTimerMinutes) + 1) % options.size]
+        setSleepTimer(next)
+    }
+
+    fun setSleepTimer(minutes: Int) {
+        sleepJob?.cancel()
+        sleepJob = null
+        sleepTimerMinutes = minutes
+        sleepRemainingMin = minutes
+        if (minutes <= 0) return
+        sleepJob = scope.launch {
+            var remainingMs = minutes * 60_000L
+            while (remainingMs > 0) {
+                val step = minOf(remainingMs, 1_000L)
+                delay(step)
+                remainingMs -= step
+                sleepRemainingMin = ((remainingMs + 59_999L) / 60_000L).toInt()
+            }
+            sleepTimerMinutes = 0
+            sleepRemainingMin = 0
+            controller?.pause()
+        }
+    }
+    var speedPanelOpen by mutableStateOf(false)
+
+    var holdSpeedActive by mutableStateOf(false)
+        internal set
+
+    var scrubPreviewMs by mutableStateOf<Long?>(null)
+        internal set
+    var scrubDragging by mutableStateOf(false)
+        internal set
+    private var resumePlayAfterScrub = false
+    private var speedBeforeHold: Float? = null
+    var videoControlsVisible by mutableStateOf(false)
+        internal set
+
+    init {
+
+        scope.launch {
+            snapshotFlow { StreamRecovery.recovering to StreamRecovery.failed }.collect { (_, failed) ->
+                syncFromPlayer()
+                if (failed != null && failed.first == current?.id) {
+                    error = failed.second
+                    isBuffering = false
+                }
+            }
+        }
+    }
+    var videoAspect by mutableFloatStateOf(16f / 9f)
+        private set
+
+    private var aspectFromFrames = false
+
+    
+
+
+
+    val stageAspect: Float get() = if (AudioOnly.enabled) AudioStageAspect else {
+        if (portraitTall) TallStageAspect
+        else min(videoAspect.coerceIn(StageMinAspect, StageMaxAspect), StageFrameAspect)
+    }
+    var firstFrameRendered by mutableStateOf(false)
+        private set
+
+    var playingFormat by mutableStateOf<String?>(null)
+        private set
+
+    var decodedHeight by mutableStateOf<Int?>(null)
+        private set
+
+    var expanded by mutableStateOf(false)
+
+    var fullscreen by mutableStateOf(false)
+
+    /** Portrait videos go edge-to-edge without rotating the device, exactly like YouTube. */
+    var portraitFullscreen by mutableStateOf(false)
+
+    /** Fullscreen vertical viewing mode (0.0.8): entered by dragging down
+     *  on the video area in portrait, the stage takes the whole screen and
+     *  the video fills it edge to edge, like YouTube's vertical mode. The
+     *  name is kept from the first iteration, which only grew the frame. */
+    var portraitTall by mutableStateOf(false)
+
+    val portraitVideo get() = videoAspect < 1.02f
+
+    var sheet by mutableStateOf<PlayerSheet?>(null)
+
+    var downloadFor by mutableStateOf<VideoItem?>(null)
+
+    val comments = CommentsState(scope)
+
+    /** Polled only while a live stream's chat sheet is open. */
+    val liveChat = LiveChatState(scope)
+
+    /** Chat replay for past streams; probed silently on open, buffered on demand. */
+    val chatReplay = ChatReplayState(scope)
+
+
+
+    var accountState by mutableStateOf<VideoAccountState?>(null)
+        private set
+    private var originalLike = LikeStatus.None
+    var inWatchLater by mutableStateOf(false)
+        private set
+
+    /** Audio tracks offered by the current video, Original first. */
+    var audioOptions by mutableStateOf<List<AudioTrackOption>>(emptyList())
+        private set
+
+    /** The cue text Media3's text renderer is currently showing, or null when captions are off. */
+    var captionText by mutableStateOf<String?>(null)
+        private set
+
+    private var likeOverrides by mutableStateOf<Map<String, LikeStatus>>(emptyMap())
+    private var likeDeltas by mutableStateOf<Map<String, Long>>(emptyMap())
+    private var dislikeDeltas by mutableStateOf<Map<String, Long>>(emptyMap())
+
+    val currentLike: LikeStatus
+        get() = current?.id?.let { likeOverrides[it] } ?: accountState?.like ?: LikeStatus.None
+
+    var actionMessage by mutableStateOf<String?>(null)
+
+    private var loadJob: Job? = null
+
+    private var pendingStart: VideoItem? = null
+
+
+
+
+
+    private val known = HashMap<String, VideoItem>()
+
+    var queue by mutableStateOf<List<VideoItem>>(emptyList())
+        private set
+
+    /** Videos watched before the current one, oldest first; powers the
+     *  previous-video button. Video mode only, capped at 50 entries. */
+    private val playedHistory = ArrayDeque<VideoItem>()
+    private var historyNavInProgress = false
+    private var currentShownAsMusic = false
+
+    var musicQueue by mutableStateOf<List<VideoItem>>(emptyList())
+        private set
+
+    /** Continuation token for the living music queue: while non-null the
+     *  queue can grow by fetching the next watch-next page. */
+    var musicContinuation by mutableStateOf<String?>(null)
+        private set
+
+    var musicQueueSource by mutableStateOf<MusicQueueSource>(MusicQueueSource.None)
+        private set
+
+    /** Bumped whenever the queue context is replaced wholesale, so stale
+     *  refill/radio coroutines can drop their results. */
+    private var musicQueueGeneration = 0
+    private var refillInFlight = false
+
+    /** Related list diversified for display (near-duplicate titles
+     *  dropped, max 2 per channel) with home-feed items interleaved.
+     *  Since 0.0.7-test3 this displayed list is also the source of the
+     *  video up-next pick, so what the user sees is what plays next. */
+    var displayRelated by mutableStateOf<List<VideoItem>>(emptyList())
+        private set
+
+    /** Watch-next continuation token for paging [displayRelated]; null
+     *  until the details land (or a first page is lazily fetched). */
+    var relatedContinuation by mutableStateOf<String?>(null)
+        private set
+
+    /** A related page fetch is in flight. */
+    var relatedLoadingMore by mutableStateOf(false)
+        private set
+
+    /** No more related pages exist for the current video. */
+    var relatedExhausted by mutableStateOf(false)
+        private set
+
+    /** Bumped on every show() so a stale page fetch from a previous
+     *  video can never append to the new video's list. */
+    private var relatedGen = 0
+    private var relatedJob: Job? = null
+    private var relatedLazyTokenTried = false
+
+    /** Persistent dedupe state across related pages: token sets of
+     *  everything kept so far (seeded with the playing title), per
+     *  channel counts over the kept related entries, and the ids
+     *  already on display. */
+    private val relatedKeptTokens = ArrayList<Set<String>>()
+    private val relatedChannelCounts = HashMap<String, Int>()
+    private val relatedShownIds = HashSet<String>()
+
+    fun open(item: VideoItem, expand: Boolean = true) {
+        isMusicMode = false
+        AudioOnly.set(false)
+        runCatching { applyVideoTrack() }
+        if (expand) expanded = true
+        if (current?.id == item.id && error == null) return
+        known[item.id] = item
+        show(item, startPlayback = true)
+    }
+
+    fun openMusic(item: VideoItem, expand: Boolean = true) {
+        openMusicQueue(listOf(item), 0, expand)
+        // A single song opens with an empty queue: seed it with the song's
+        // radio so up-next fills with the same artist / genre.
+        seedRadioFor(item)
+    }
+
+    /** Fetches the radio for [item] and adopts it as the up-next queue, but
+     *  only if nothing else has taken over the queue in the meantime. */
+    private fun seedRadioFor(item: VideoItem) {
+        val gen = musicQueueGeneration
+        scope.launch {
+            runCatching { InnerTube.musicRadio(item.id) }.onSuccess { page ->
+                if (gen != musicQueueGeneration || !isMusicMode) return@onSuccess
+                if (current?.id != item.id || musicQueue.isNotEmpty()) return@onSuccess
+                musicQueue = page.items.filter { it.id != item.id }
+                musicContinuation = page.continuation
+                musicQueueSource = MusicQueueSource.RadioSong(item.id)
+            }
+        }
+    }
+
+    fun openMusicQueue(
+        items: List<VideoItem>,
+        index: Int,
+        expand: Boolean = true,
+        continuation: String? = null,
+        source: MusicQueueSource = MusicQueueSource.ListSource,
+    ) {
+        val item = items.getOrNull(index) ?: return
+        isMusicMode = true
+        applyVideoTrack()
+        musicQueueGeneration++
+        if (source == MusicQueueSource.LooseList) {
+            // Loose surface: only the tapped song plays from the list;
+            // its radio (seeded below) becomes the up-next queue, exactly
+            // like openMusic for a single song.
+            musicQueue = emptyList()
+        } else {
+            musicQueue = items.drop(index + 1).filter { it.id != item.id }
+            // Pre-resolve the first upcoming streams so skipping feels instant.
+            musicQueue.take(2).forEach { StreamCache.prefetch(it.id) }
+        }
+        musicContinuation = continuation
+        musicQueueSource = source
+        if (expand) expanded = true
+        if (source == MusicQueueSource.LooseList) seedRadioFor(item)
+        if (current?.id == item.id && error == null) return
+        known[item.id] = item
+        show(item, startPlayback = true)
+    }
+
+    private fun nextMusicIndex(): Int =
+        if (shuffleEnabled && musicQueue.size > 1) musicQueue.indices.random() else 0
+
+    /** Plays the head of the music queue (a random entry while shuffled),
+     *  preserving the queue's continuation and source, then tops the queue
+     *  back up if it is running low. */
+    private fun consumeMusicHead() {
+        if (musicQueue.isEmpty()) return
+        val idx = nextMusicIndex()
+        val rotated = if (idx == 0) musicQueue else musicQueue.drop(idx) + musicQueue.take(idx)
+        openMusicQueue(rotated, 0, expanded, continuation = musicContinuation, source = musicQueueSource)
+        maybeRefillMusicQueue()
+    }
+
+    /** Fetches the next watch-next page when the queue runs low. [after]
+     *  runs on the main scope once fresh items have been appended. */
+    fun maybeRefillMusicQueue(after: (() -> Unit)? = null) {
+        if (!isMusicMode) return
+        val token = musicContinuation ?: return
+        if (refillInFlight || musicQueue.size > 5) return
+        refillInFlight = true
+        val gen = musicQueueGeneration
+        scope.launch {
+            val page = runCatching { InnerTube.musicNext(continuation = token) }.getOrNull()
+            refillInFlight = false
+            if (page == null) return@launch
+            if (gen != musicQueueGeneration || !isMusicMode) return@launch
+            val seen = HashSet<String>()
+            current?.id?.let { seen.add(it) }
+            musicQueue.forEach { seen.add(it.id) }
+            val fresh = page.items.filter { seen.add(it.id) }
+            if (fresh.isNotEmpty()) musicQueue = musicQueue + fresh
+            musicContinuation = page.continuation
+            after?.invoke()
+        }
+    }
+
+    fun playFromMusicQueue(index: Int) {
+        if (index !in musicQueue.indices) return
+        openMusicQueue(musicQueue, index, expanded, continuation = musicContinuation, source = musicQueueSource)
+    }
+
+    fun removeFromMusicQueue(index: Int) {
+        if (index !in musicQueue.indices) return
+        musicQueue = musicQueue.filterIndexed { i, _ -> i != index }
+    }
+
+    fun moveMusicQueue(from: Int, to: Int) {
+        if (from !in musicQueue.indices || to !in musicQueue.indices || from == to) return
+        val list = musicQueue.toMutableList()
+        val moved = list.removeAt(from)
+        list.add(to, moved)
+        musicQueue = list
+    }
+
+    fun clearMusicQueue() {
+        musicQueue = emptyList()
+        musicContinuation = null
+        musicQueueSource = MusicQueueSource.None
+        musicQueueGeneration++
+    }
+
+    /** Starts a radio from [item]: replaces the up-next of the currently
+     *  playing song, or plays the song and seeds its radio. */
+    fun startRadio(item: VideoItem) {
+        known[item.id] = item
+        if (isMusicMode && current?.id == item.id) {
+            scope.launch {
+                runCatching { InnerTube.musicRadio(item.id) }.onSuccess { page ->
+                    if (!isMusicMode || current?.id != item.id) return@onSuccess
+                    musicQueue = page.items.filter { it.id != item.id }
+                    musicContinuation = page.continuation
+                    musicQueueSource = MusicQueueSource.RadioSong(item.id)
+                    musicQueueGeneration++
+                    actionMessage = I18n.t("radio_started_toast", "Radio started from {title}")
+                        .replace("{title}", item.title)
+                }
+            }
+        } else {
+            openMusicQueue(listOf(item), 0, expand = true)
+            seedRadioFor(item)
+        }
+    }
+
+    fun startPlaylistRadio(playlistId: String) {
+        scope.launch {
+            runCatching { InnerTube.musicPlaylistRadio(playlistId) }.onSuccess { page ->
+                if (page.items.isEmpty()) return@onSuccess
+                val idx = if (page.currentIndex in page.items.indices) page.currentIndex else 0
+                openMusicQueue(
+                    page.items,
+                    idx,
+                    expand = true,
+                    continuation = page.continuation,
+                    source = MusicQueueSource.RadioPlaylist(playlistId),
+                )
+            }
+        }
+    }
+
+    fun playNextMusic(item: VideoItem) {
+        val player = controller ?: return
+        known[item.id] = item
+        if (current == null || player.mediaItemCount == 0) { openMusic(item, expand = false); return }
+        player.addMediaItem(player.currentMediaItemIndex + 1, mediaItemFor(item))
+        actionMessage = I18n.t("playing_next", "Playing next")
+        continueIfEnded(player)
+    }
+
+    
+
+
+
+
+    private var openedAt = 0L
+
+    private fun show(item: VideoItem, startPlayback: Boolean) {
+        endHoldSpeed()
+        openedAt = android.os.SystemClock.elapsedRealtime()
+        Log.i("LokoTubeTime", "open ${item.id}")
+        if (startPlayback) Net.prewarmMediaConnection()
+        val outgoing = current
+        if (outgoing != null && outgoing.id != item.id && !isMusicMode && !currentShownAsMusic && !historyNavInProgress) {
+            if (playedHistory.lastOrNull()?.id != outgoing.id) {
+                playedHistory.addLast(outgoing)
+                while (playedHistory.size > 50) playedHistory.removeFirst()
+            }
+        }
+        historyNavInProgress = false
+        currentShownAsMusic = isMusicMode
+        current = item
+        portraitTall = false
+        if (isMusicMode) {
+            RecentMusic.record(item)
+            WatchHistory.record(item, WatchHistory.KIND_MUSIC)
+        } else {
+            WatchHistory.record(item, WatchHistory.KIND_VIDEO)
+        }
+        details = null
+        displayRelated = emptyList()
+        relatedContinuation = null
+        relatedLoadingMore = false
+        relatedExhausted = false
+        relatedLazyTokenTried = false
+        relatedJob?.cancel()
+        relatedGen++
+        relatedKeptTokens.clear()
+        relatedChannelCounts.clear()
+        relatedShownIds.clear()
+        error = null
+        firstFrameRendered = false
+        videoAspect = 16f / 9f
+        aspectFromFrames = false
+        decodedHeight = null
+        playingFormat = null
+        loading = true
+        sheet = null
+        comments.clearFor(item.id)
+        liveChat.stop()
+        chatReplay.reset()
+        if (!item.isLive && item.localUri == null) chatReplay.prepare(item.id)
+        accountState = null
+        inWatchLater = false
+        audioOptions = emptyList()
+        captionText = null
+        speedPanelOpen = false
+        videoZoom = 1f
+        zoomToFill = false
+        zoomStretch = false
+        portraitFullscreen = false
+        if (item.localUri != null) {
+
+            details = VideoDetails(
+                item = item,
+                description = "",
+                likes = 0,
+                dislikes = -1,
+                subscribers = 0,
+                related = emptyList(),
+                playable = true,
+                quality = null,
+                qualities = emptyList(),
+                aspect = null,
+            )
+            loading = false
+            if (startPlayback) startPlayback(item)
+            return
+        }
+        if (Account.signedIn) {
+            scope.launch {
+                runCatching { InnerTube.videoState(item.id) }
+                    .onSuccess { if (current?.id == item.id) { accountState = it; originalLike = it.like } }
+                    .onFailure { Log.w(TAG, "account state for ${item.id}", it) }
+            }
+        }
+        loadJob?.cancel()
+        loadJob = scope.launch {
+            runCatching { YouTube.details(item.id) }
+                .onSuccess { d ->
+                    Log.i("LokoTubeTime", "details +${android.os.SystemClock.elapsedRealtime() - openedAt}ms")
+                    details = d
+                    val collapsedRelated = diversifyRelated(d.related, item)
+                    displayRelated = interleaveFeed(collapsedRelated, item)
+                    // Seed the cross-page dedupe with page 1 so later
+                    // pages filter against everything already shown.
+                    relatedKeptTokens.add(titleTokens(item.title))
+                    collapsedRelated.forEach { entry ->
+                        relatedKeptTokens.add(titleTokens(entry.title))
+                        val channelKey = entry.channel.lowercase()
+                        relatedChannelCounts[channelKey] = relatedChannelCounts.getOrDefault(channelKey, 0) + 1
+                    }
+                    displayRelated.forEach { relatedShownIds.add(it.id) }
+                    relatedShownIds.add(item.id)
+                    relatedContinuation = d.relatedNext
+                    // Pre-resolve the likely next streams in the background
+                    // so switching tracks does not pay the full lookup cost.
+                    val nextIds = if (isMusicMode) {
+                        musicQueue.take(2).map { it.id }
+                    } else {
+                        listOfNotNull(
+                            queue.firstOrNull()?.id,
+                            pickDisplayedNext(displayRelated)?.id,
+                        )
+                    }
+                    nextIds.distinct().forEach { id -> if (id != item.id) StreamCache.prefetch(id) }
+                    refreshTracks()
+
+                    if (!aspectFromFrames) d.aspect?.let { videoAspect = it }
+
+
+                    comments.load(item.id)
+                    known[item.id] = d.item
+                    d.related.forEach { known[it.id] = it }
+                    if (!d.playable) error = I18n.t("no_playable_stream", "No playable stream was found for this video.")
+                    else {
+                        if (startPlayback) startPlayback(d.item)
+                        primeUpNextMusic()
+                    }
+
+                    scope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                        val dislikes = fetchDislikeCount(item.id)
+                        if (current?.id == item.id && dislikes >= 0) {
+                            details = details?.copy(dislikes = dislikes)
+                        }
+                    }
+                }
+                .onFailure {
+                    Log.w(TAG, "details failed for ${item.id}", it)
+                    error = YouTube.friendlyError(it)
+
+                    comments.load(item.id)
+                }
+            loading = false
+        }
+    }
+
+    private fun mediaItemFor(item: VideoItem): MediaItem {
+        val localUri = item.localUri
+        val metadata = MediaMetadata.Builder()
+            .setTitle(item.title)
+            .setArtist(item.channel)
+            .setArtworkUri(item.thumbnail?.toUri())
+            .apply {
+                if (localUri != null) {
+                    setExtras(android.os.Bundle().apply { putString("local_uri", localUri) })
+                }
+            }
+            .build()
+        return MediaItem.Builder()
+            .setMediaId(item.id)
+            .setMediaMetadata(metadata)
+            .apply {
+                if (localUri != null) {
+
+
+                    setRequestMetadata(
+                        MediaItem.RequestMetadata.Builder().setMediaUri(localUri.toUri()).build(),
+                    )
+                }
+            }
+            .build()
+    }
+
+    private fun startPlayback(item: VideoItem) {
+        val player = controller ?: run { pendingStart = item; return }
+
+        replaceCurrent(player, item, positionMs = ResumeStore.startPosition(item.id))
+        player.play()
+        if (selectedSubtitleLanguage != null) setSubtitleLanguage(selectedSubtitleLanguage)
+        refreshTracks()
+    }
+
+    
+
+
+
+
+    private fun replaceCurrent(player: MediaController, item: VideoItem, positionMs: Long) {
+        if (player.mediaItemCount == 0) {
+            player.setMediaItem(mediaItemFor(item), positionMs)
+        } else {
+
+
+            swapping = true
+            try {
+                val index = player.currentMediaItemIndex
+                // Drop stale up-next so a manual music switch starts a clean
+                // queue (video keeps its add-to-queue items).
+                if (isMusicMode && player.mediaItemCount > index + 1) {
+                    player.removeMediaItems(index + 1, player.mediaItemCount)
+                }
+                player.addMediaItem(index + 1, mediaItemFor(item))
+                player.seekTo(index + 1, positionMs)
+                player.removeMediaItem(index)
+            } finally {
+                swapping = false
+            }
+        }
+        player.prepare()
+    }
+
+    /** Pre-buffers the next music track by adding it to the player's
+     *  playlist right after the current item, so ExoPlayer fetches its
+     *  audio ahead of time and the next transition starts instantly. */
+    private fun primeUpNextMusic() {
+        if (!isMusicMode) return
+        val player = controller ?: return
+        val next = musicQueue.firstOrNull() ?: return
+        val id = next.id
+        scope.launch {
+            val ok = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                runCatching { StreamCache.getOrLoad(id) }.getOrNull() != null
+            }
+            if (!ok || !isMusicMode || controller !== player) return@launch
+            if (current?.id == id) return@launch
+            if (player.currentMediaItemIndex + 1 >= player.mediaItemCount) {
+                known[id] = next
+                player.addMediaItem(mediaItemFor(next))
+            }
+        }
+    }
+
+    fun playNext(item: VideoItem) {
+        val player = controller ?: return
+        known[item.id] = item
+        if (current == null || player.mediaItemCount == 0) { open(item, expand = false); return }
+        player.addMediaItem(player.currentMediaItemIndex + 1, mediaItemFor(item))
+        actionMessage = I18n.t("playing_next", "Playing next")
+        continueIfEnded(player)
+    }
+
+
+    private fun continueIfEnded(player: MediaController) {
+        if (player.playbackState == Player.STATE_ENDED && player.currentMediaItemIndex + 1 < player.mediaItemCount) {
+            player.seekTo(player.currentMediaItemIndex + 1, 0L)
+            player.play()
+        }
+    }
+
+    fun addToQueue(item: VideoItem) {
+        val player = controller ?: return
+        known[item.id] = item
+        if (current == null || player.mediaItemCount == 0) { open(item, expand = false); return }
+        player.addMediaItem(mediaItemFor(item))
+        actionMessage = I18n.t("added_to_queue", "Added to queue")
+        continueIfEnded(player)
+    }
+
+
+    fun playFromQueue(index: Int) {
+        val player = controller ?: return
+        player.seekTo(player.currentMediaItemIndex + 1 + index, 0L)
+        player.play()
+    }
+
+    fun removeFromQueue(index: Int) {
+        val player = controller ?: return
+        player.removeMediaItem(player.currentMediaItemIndex + 1 + index)
+    }
+
+    fun clearQueue() {
+        val player = controller ?: return
+        val from = player.currentMediaItemIndex + 1
+        if (from < player.mediaItemCount) player.removeMediaItems(from, player.mediaItemCount)
+    }
+
+    private fun rebuildQueue() {
+        val player = controller ?: return
+        val from = player.currentMediaItemIndex + 1
+        queue = (from until player.mediaItemCount).map { i -> itemFor(player.getMediaItemAt(i)) }
+    }
+
+    private fun itemFor(media: MediaItem): VideoItem = known[media.mediaId] ?: VideoItem(
+        id = media.mediaId,
+        title = media.mediaMetadata.title?.toString().orEmpty(),
+        channel = media.mediaMetadata.artist?.toString().orEmpty(),
+        channelUrl = null,
+        thumbnail = media.mediaMetadata.artworkUri?.toString(),
+        avatar = null,
+        durationSec = 0,
+        views = -1,
+        uploaded = null,
+    ).also { known[media.mediaId] = it }
+
+    /** Words that carry no identity for a song/video title: versions of
+     *  the same song differ exactly in these (and in word order), so the
+     *  similarity check below ignores them. */
+    private val TITLE_FILLER = setOf(
+        "playlist", "full", "mix",
+        "lyrics", "lyric", "feat", "ft", "featuring",
+        "official", "video", "audio", "hd", "hq", "mv", "visualizer",
+    )
+
+    private fun titleTokens(title: String): Set<String> =
+        title.lowercase()
+            .replace(Regex("[^a-z0-9 ]"), " ")
+            .split(Regex("\\s+"))
+            .filter { it.isNotBlank() && it !in TITLE_FILLER }
+            .toSet()
+
+    /** Same-content test on title token sets using the containment
+     *  (overlap) coefficient: |A∩B| / min(|A|,|B|) >= 0.75. Containment
+     *  catches subset and reordered titles ("Song - Artist" vs
+     *  "Artist - Song (Lyrics)") that a Jaccard index would miss. */
+    private fun sameContent(a: Set<String>, b: Set<String>): Boolean {
+        if (a.isEmpty() || b.isEmpty()) return false
+        val overlap = a.count { it in b }
+        return overlap.toFloat() / minOf(a.size, b.size) >= 0.75f
+    }
+
+    /** Display-only diversification of a related list: drops entries that
+     *  are the same content as the currently playing title or as an
+     *  earlier kept entry (token-set similarity, so reordered or
+     *  re-labelled uploads of the same song collapse to the first one)
+     *  and caps each channel at 2 entries, keeping server order. */
+    private fun diversifyRelated(related: List<VideoItem>, currentItem: VideoItem): List<VideoItem> {
+        val keptTokens = ArrayList<Set<String>>()
+        keptTokens.add(titleTokens(currentItem.title))
+        val channelCounts = HashMap<String, Int>()
+        val out = ArrayList<VideoItem>()
+        for (entry in related) {
+            if (entry.id == currentItem.id) continue
+            val tokens = titleTokens(entry.title)
+            if (keptTokens.any { sameContent(tokens, it) }) continue
+            val channelKey = entry.channel.lowercase()
+            val count = channelCounts.getOrDefault(channelKey, 0)
+            if (count >= 2) continue
+            channelCounts[channelKey] = count + 1
+            keptTokens.add(tokens)
+            out.add(entry)
+        }
+        return out
+    }
+
+    /** Display-only interleave: splices home-feed (FYP) items into the
+     *  collapsed related list, 1 feed item after every 4 related items,
+     *  at most 6 inserts, so "Video lainnya" is not a wall of near
+     *  duplicates. Snapshot only via [HomeFeedHooks]; an empty snapshot
+     *  leaves the list untouched. Never touches details.related. The
+     *  interleaved result is what autoplay now picks from, and pages
+     *  appended later are not interleaved again (the insert cap stays
+     *  at the page-1 total of 6). */
+    private fun interleaveFeed(collapsed: List<VideoItem>, currentItem: VideoItem): List<VideoItem> {
+        if (collapsed.isEmpty()) return collapsed
+        val feed = HomeFeedHooks.provider?.invoke().orEmpty()
+        if (feed.isEmpty()) return collapsed
+        val collapsedIds = collapsed.mapTo(HashSet()) { it.id }
+        val currentTokens = titleTokens(currentItem.title)
+        val pool = feed.distinctBy { it.id }.filter { entry ->
+            entry.id != currentItem.id &&
+                entry.id !in collapsedIds &&
+                !sameContent(titleTokens(entry.title), currentTokens)
+        }
+        if (pool.isEmpty()) return collapsed
+        val out = ArrayList<VideoItem>(collapsed.size + 6)
+        var inserted = 0
+        collapsed.forEachIndexed { index, item ->
+            out.add(item)
+            if ((index + 1) % 4 == 0 && inserted < pool.size && inserted < 6) {
+                out.add(pool[inserted])
+                inserted++
+            }
+        }
+        return out
+    }
+
+    /** The one video up-next pick, shared by autoplay and the next-item
+     *  prefetch so the two can never diverge: the first entry of the
+     *  displayed list that is neither the current video nor one already
+     *  played this session; if that filter empties the list, the first
+     *  entry that is not the current video; otherwise null. */
+    private fun pickDisplayedNext(list: List<VideoItem>): VideoItem? {
+        val currId = current?.id ?: return null
+        return list.firstOrNull { it.id != currId && playedHistory.none { played -> played.id == it.id } }
+            ?: list.firstOrNull { it.id != currId }
+    }
+
+    private fun autoPlayNext() {
+        val curr = current ?: return
+        val currId = curr.id
+
+        if (isMusicMode) {
+            autoPlayNextMusic()
+            return
+        }
+        val next = pickDisplayedNext(displayRelated)
+        if (next != null) {
+            actionMessage = I18n.t("up_next", "Up next: {title}").replace("{title}", next.title)
+            open(next, expand = expanded)
+        } else {
+            scope.launch {
+                runCatching { YouTube.details(currId) }
+                    .onSuccess { d ->
+                        val disp = interleaveFeed(diversifyRelated(d.related, curr), curr)
+                        val rel = pickDisplayedNext(disp)
+                        if (rel != null) {
+                            actionMessage = I18n.t("up_next", "Up next: {title}").replace("{title}", rel.title)
+                            open(rel, expand = expanded)
+                        }
+                    }
+            }
+        }
+    }
+
+    /** Fetch the next watch-next page and append its fresh entries to
+     *  the displayed related list. When the details carried no token
+     *  (the common NewPipe path), the first InnerTube page is fetched
+     *  lazily once, purely to obtain a token; its items are not
+     *  appended because the displayed page 1 came from NewPipe. Every
+     *  page is filtered with the same dedupe page 1 used, via the
+     *  persistent state seeded when the details landed. */
+    fun loadMoreRelated() {
+        if (isMusicMode) return
+        val owner = current ?: return
+        if (relatedLoadingMore || relatedExhausted || displayRelated.isEmpty()) return
+        val gen = relatedGen
+        relatedLoadingMore = true
+        relatedJob = scope.launch {
+            var token = relatedContinuation
+            if (token == null) {
+                if (relatedLazyTokenTried) {
+                    relatedExhausted = true
+                    relatedLoadingMore = false
+                    return@launch
+                }
+                relatedLazyTokenTried = true
+                val fp = runCatching { InnerTube.relatedFirstPage(owner.id) }.getOrNull()
+                if (gen != relatedGen || current?.id != owner.id) return@launch
+                if (fp == null) {
+                    relatedLoadingMore = false
+                    return@launch
+                }
+                token = fp.next
+                relatedContinuation = token
+                if (token == null) {
+                    relatedExhausted = true
+                    relatedLoadingMore = false
+                    return@launch
+                }
+            }
+            val page = runCatching { InnerTube.relatedNextPage(token) }.getOrNull()
+            if (gen != relatedGen || current?.id != owner.id) return@launch
+            relatedLoadingMore = false
+            if (page == null) return@launch
+            relatedContinuation = page.next
+            if (page.next == null) relatedExhausted = true
+            if (page.videos.isEmpty()) {
+                relatedExhausted = true
+                return@launch
+            }
+            val fresh = ArrayList<VideoItem>()
+            for (entry in page.videos) {
+                if (entry.id == owner.id || entry.id in relatedShownIds) continue
+                val tokens = titleTokens(entry.title)
+                if (relatedKeptTokens.any { sameContent(tokens, it) }) continue
+                val channelKey = entry.channel.lowercase()
+                if (relatedChannelCounts.getOrDefault(channelKey, 0) >= 2) continue
+                relatedChannelCounts[channelKey] = relatedChannelCounts.getOrDefault(channelKey, 0) + 1
+                relatedKeptTokens.add(tokens)
+                relatedShownIds.add(entry.id)
+                fresh.add(entry)
+            }
+            page.videos.forEach { known[it.id] = it }
+            if (fresh.isNotEmpty()) displayRelated = displayRelated + fresh
+        }
+    }
+
+    /** Music autoplay: consume the living queue; refill it when it runs
+     *  dry; when nothing is left at all, fall into the finished song's
+     *  radio so playback keeps flowing in the same genre. */
+    private fun autoPlayNextMusic() {
+        val curr = current ?: return
+        if (musicQueue.isNotEmpty()) {
+            consumeMusicHead()
+            return
+        }
+        if (musicContinuation != null) {
+            val gen = musicQueueGeneration
+            val finishedId = curr.id
+            maybeRefillMusicQueue {
+                if (gen == musicQueueGeneration && isMusicMode &&
+                    current?.id == finishedId && musicQueue.isNotEmpty()
+                ) {
+                    consumeMusicHead()
+                }
+            }
+            return
+        }
+        // Only dive into radio when a queue context is live; a cleared
+        // queue (source None) must end playback instead of resurrecting.
+        // The seed is `finished` itself, which for a bound list is the
+        // last played song by construction.
+        if (musicQueueSource == MusicQueueSource.None) return
+        val finished = curr
+        scope.launch {
+            runCatching { InnerTube.musicRadio(finished.id) }.onSuccess { page ->
+                if (!isMusicMode || current?.id != finished.id) return@onSuccess
+                val rest = page.items.filter { it.id != finished.id }
+                if (rest.isNotEmpty()) {
+                    actionMessage = I18n.t("up_next", "Up next: {title}").replace("{title}", rest.first().title)
+                    openMusicQueue(
+                        rest,
+                        0,
+                        expanded,
+                        continuation = page.continuation,
+                        source = MusicQueueSource.RadioSong(finished.id),
+                    )
+                }
+            }
+        }
+    }
+
+
+    private var swapping = false
+
+    private fun onPlayerMovedTo(media: MediaItem) {
+        val player = controller ?: return
+        if (swapping || media.mediaId.isBlank()) return
+
+        if (player.currentMediaItemIndex > 0) player.removeMediaItems(0, player.currentMediaItemIndex)
+        // Keep the logical music queue in sync with the player's auto-advance.
+        if (isMusicMode && musicQueue.firstOrNull()?.id == media.mediaId) {
+            musicQueue = musicQueue.drop(1)
+        }
+        if (media.mediaId != current?.id) show(itemFor(media), startPlayback = false)
+    }
+
+
+    val segments: List<SponsorBlock.Segment>
+        get() = current?.id?.let { SponsorBlock.forUi[it] }.orEmpty()
+
+
+    val askSegment: SponsorBlock.Segment?
+        get() = if (!SponsorBlock.enabled) null else segments.firstOrNull {
+            it.action == SponsorBlock.Action.Button && positionMs in it.startMs until it.endMs - 500
+        }
+
+    fun skipSegment(segment: SponsorBlock.Segment) = seekTo(segment.endMs)
+
+    fun undoSkip(skip: SponsorBlock.Skip) {
+        if (skip.videoId == current?.id) seekTo(skip.segment.startMs)
+        SponsorBlock.lastSkip = null
+    }
+
+
+    fun refreshAccountState() {
+        val item = current ?: return
+        accountState = null
+        inWatchLater = false
+        if (!Account.signedIn) return
+        scope.launch {
+            runCatching { InnerTube.videoState(item.id) }
+                .onSuccess { if (current?.id == item.id) { accountState = it; originalLike = it.like } }
+                .onFailure { Log.w(TAG, "account state for ${item.id}", it) }
+        }
+    }
+
+
+    val displayLikes: Long
+        get() {
+            val base = details?.likes ?: return -1
+            val delta = current?.id?.let { likeDeltas[it] } ?: 0L
+            return (base + delta).coerceAtLeast(0)
+        }
+
+    val displayDislikes: Long
+        get() {
+            val base = details?.dislikes ?: return -1
+            if (base < 0) return -1
+            val delta = current?.id?.let { dislikeDeltas[it] } ?: 0L
+            return (base + delta).coerceAtLeast(0)
+        }
+
+    private fun likeWeight(status: LikeStatus): Long = when (status) {
+        LikeStatus.Like -> 1L
+        LikeStatus.Dislike -> -1L
+        LikeStatus.None -> 0L
+    }
+
+    private fun dislikeWeight(status: LikeStatus): Long = if (status == LikeStatus.Dislike) 1L else 0L
+
+    /**
+     * Tapping a thumb is optimistic for everyone, signed in or not. The visible count moves
+     * immediately; the network call only decides whether the choice survives a restart.
+     */
+    fun setLike(target: LikeStatus) {
+        val id = current?.id ?: return
+        val before = currentLike
+        val next = if (before == target) LikeStatus.None else target
+        likeOverrides = likeOverrides + (id to next)
+        likeDeltas = likeDeltas + (id to ((likeDeltas[id] ?: 0L) + likeWeight(next) - likeWeight(before)))
+        dislikeDeltas = dislikeDeltas + (id to ((dislikeDeltas[id] ?: 0L) + dislikeWeight(next) - dislikeWeight(before)))
+        actionMessage = when (next) {
+            LikeStatus.Like -> I18n.t("liked", "Liked")
+            LikeStatus.Dislike -> I18n.t("not_for_me", "Not for me")
+            LikeStatus.None -> I18n.t("rating_removed", "Rating removed")
+        }
+
+        if (!Account.signedIn) return
+        val previousAccount = accountState
+        accountState = previousAccount?.copy(like = next)
+        scope.launch {
+            runCatching { InnerTube.setLike(id, next) }
+                .onFailure {
+                    if (current?.id == id) {
+                        likeOverrides = likeOverrides + (id to before)
+                        likeDeltas = likeDeltas + (id to ((likeDeltas[id] ?: 0L) - likeWeight(next) + likeWeight(before)))
+                        dislikeDeltas = dislikeDeltas + (id to ((dislikeDeltas[id] ?: 0L) - dislikeWeight(next) + dislikeWeight(before)))
+                        accountState = previousAccount
+                        actionMessage = I18n.t("like_update_failed", "Couldn't update your like.")
+                    }
+                }
+        }
+    }
+
+    fun toggleLike() = setLike(LikeStatus.Like)
+
+    fun toggleDislike() = setLike(LikeStatus.Dislike)
+
+    fun toggleSubscribe() {
+        val before = accountState ?: return
+        val channelId = before.channelId
+            ?: details?.item?.channelUrl?.substringAfter("/channel/", "")?.takeIf { it.startsWith("UC") }
+            ?: return
+        val subscribe = before.subscribed != true
+        accountState = before.copy(subscribed = subscribe, channelId = channelId)
+        scope.launch {
+            runCatching { InnerTube.setSubscribed(channelId, subscribe) }
+                .onFailure { accountState = before; actionMessage = I18n.t("subscription_update_failed", "Couldn't update your subscription.") }
+        }
+    }
+
+    fun toggleWatchLater() {
+        val id = current?.id ?: return
+        val add = !inWatchLater
+        inWatchLater = add
+        scope.launch {
+            runCatching { InnerTube.setInWatchLater(id, add) }
+                .onSuccess { actionMessage = if (add) I18n.t("saved_to_watch_later", "Saved to Watch later") else I18n.t("removed_from_watch_later", "Removed from Watch later") }
+                .onFailure { inWatchLater = !add; actionMessage = I18n.t("watch_later_update_failed", "Couldn't update Watch later."); Log.w(TAG, "watch later $id", it) }
+        }
+    }
+
+
+    fun saveToWatchLater(video: VideoItem) {
+        scope.launch {
+            runCatching { InnerTube.setInWatchLater(video.id, true) }
+                .onSuccess {
+                    if (current?.id == video.id) inWatchLater = true
+                    actionMessage = I18n.t("saved_to_watch_later", "Saved to Watch later")
+                }
+                .onFailure { actionMessage = I18n.t("watch_later_save_failed", "Couldn't save to Watch later."); Log.w(TAG, "watch later ${video.id}", it) }
+        }
+    }
+
+    
+
+
+
+    fun setQuality(height: Int?, preferHdr: Boolean = QualityPreference.hdr) {
+        QualityPreference.set(height, preferHdr)
+        val player = controller ?: return
+        val item = details?.item ?: current ?: return
+
+        // The service rebuilds the source from the exact rendition StreamSelection
+        // picked. Forcing a min/max height here would filter that rendition out when
+        // an HDR row falls back to a lower SDR height, leaving the player with no
+        // video track at all.
+        if (item.isLive) {
+            details = details?.copy(quality = height?.let { "${it}p" } ?: I18n.t("live", "Live"))
+            return
+        }
+
+        val position = player.currentPosition
+        val playWhenReady = player.playWhenReady
+        replaceCurrent(player, item, position)
+        player.playWhenReady = playWhenReady
+        val info = StreamCache.get(item.id) ?: return
+        val picked = StreamSelection.pick(info)
+        details = details?.copy(
+            quality = picked.playedHeight?.let { "${it}p${if (picked.hdr) " HDR" else ""}" },
+        )
+    }
+
+    /** Refresh the audio-track list from the resolved stream info. */
+    fun refreshTracks() {
+        val id = current?.id ?: return
+        val cached = StreamCache.get(id)
+        if (cached != null) {
+            syncAudioPreference(cached)
+            audioOptions = StreamSelection.audioOptions(cached)
+            if (selectedSubtitleLanguage != null) setSubtitleLanguage(selectedSubtitleLanguage)
+            return
+        }
+        scope.launch {
+            val info = withContext(Dispatchers.IO) {
+                runCatching { StreamCache.getOrLoad(id) }.getOrNull()
+            } ?: return@launch
+            if (current?.id != id) return@launch
+            syncAudioPreference(info)
+            audioOptions = StreamSelection.audioOptions(info)
+            if (selectedSubtitleLanguage != null) setSubtitleLanguage(selectedSubtitleLanguage)
+        }
+    }
+
+    /** A saved language that this video does not offer falls back to Original, not silence. */
+    private fun syncAudioPreference(info: org.schabi.newpipe.extractor.stream.StreamInfo) {
+        val wanted = AudioTrackPreference.key ?: return
+        val offered = StreamSelection.audioTracks(info)
+        if (offered.none { it.key == wanted || wanted.startsWith(it.key) }) AudioTrackPreference.reset()
+    }
+
+    /**
+     * Swap the audio rendition without losing the place. The service re-reads the persisted
+     * preference when it builds the next media source.
+     */
+    fun setAudioTrack(option: AudioTrackOption?) {
+        AudioTrackPreference.set(if (option == null || option.isOriginal) null else option.key, option?.label ?: I18n.t("original", "Original"))
+        val player = controller ?: return
+        val item = details?.item ?: current ?: return
+        val position = player.currentPosition
+        val playWhenReady = player.playWhenReady
+        replaceCurrent(player, item, position)
+        player.playWhenReady = playWhenReady
+        actionMessage = I18n.t("audio_track_message", "Audio: {label}").replace("{label}", option?.label ?: I18n.t("original", "Original"))
+    }
+
+    var selectedSubtitleLanguage by mutableStateOf<String?>(null)
+        private set
+
+    private var activeCues by mutableStateOf<List<ParsedCue>>(emptyList())
+    private var subtitleFetchJob: kotlinx.coroutines.Job? = null
+
+    fun setSubtitleLanguage(code: String?, trackUrl: String? = null) {
+        selectedSubtitleLanguage = code
+        subtitleFetchJob?.cancel()
+        val p = controller
+        try {
+            if (code == null) {
+                p?.trackSelectionParameters = p?.trackSelectionParameters
+                    ?.buildUpon()
+                    ?.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
+                    ?.build() ?: return
+                activeCues = emptyList()
+                captionText = null
+                actionMessage = I18n.t("captions_off", "Captions off")
+                return
+            } else {
+                p?.trackSelectionParameters = p?.trackSelectionParameters
+                    ?.buildUpon()
+                    ?.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+                    ?.setPreferredTextLanguage(code)
+                    ?.build() ?: return
+                actionMessage = I18n.t("captions_on", "Captions on")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error setting subtitle language", e)
+        }
+
+        val videoId = current?.id ?: return
+        // Track URLs from the raw extractor list are not fmt-normalized
+        // and tags can differ by region suffix (id vs id-ID); both made
+        // whole tracks silently fetch nothing or an unparsable payload
+        // (0.0.8-test3 fix round). Prefer the normalized CaptionTracks
+        // URL, match tags by prefix, and force fmt=vtt on any raw URL.
+        fun tagMatches(tag: String): Boolean =
+            tag.equals(code, ignoreCase = true) || tag.startsWith("$code-", ignoreCase = true)
+        fun asVtt(raw: String): String = runCatching {
+            val u = raw.toHttpUrlOrNull() ?: return raw
+            u.newBuilder().setQueryParameter("fmt", "vtt").build().toString()
+        }.getOrDefault(raw)
+        val url = trackUrl?.let(::asVtt) ?: run {
+            CaptionTracks.get(videoId)?.firstOrNull { tagMatches(it.languageTag) }?.url
+                ?: StreamCache.get(videoId)?.subtitles?.firstOrNull { tagMatches(it.languageTag) }?.content?.let(::asVtt)
+        }
+
+        if (url != null) {
+            subtitleFetchJob = scope.launch(Dispatchers.IO) {
+                val cues = SubtitleParser.fetchAndParse(url)
+                withContext(Dispatchers.Main) {
+                    activeCues = cues
+                    val pos = controller?.currentPosition ?: 0L
+                    captionText = cues.lastOrNull { pos in it.startMs..it.endMs }?.text
+                }
+            }
+        }
+    }
+
+    fun setCaptions(on: Boolean) {
+        if (!on) {
+            setSubtitleLanguage(null)
+        } else {
+            val videoId = current?.id
+            val info = videoId?.let { StreamCache.get(it) }
+            val firstCode = info?.subtitles?.firstOrNull { it.isUrl && it.content.isNotBlank() }?.languageTag
+                ?: CaptionTracks.get(videoId.orEmpty())?.firstOrNull()?.languageTag
+                ?: "en"
+            setSubtitleLanguage(firstCode)
+        }
+    }
+
+
+    fun retry() = current?.let { item -> StreamCache.invalidate(item.id); current = null; open(item) }
+
+    fun togglePlay() {
+        val player = controller ?: return
+        if (player.isPlaying) player.pause() else {
+            if (player.playbackState == Player.STATE_ENDED) player.seekTo(0)
+            if (player.playbackState == Player.STATE_IDLE) player.prepare()
+            player.play()
+        }
+    }
+
+
+    fun seekBy(deltaMs: Long): Long {
+        val player = controller ?: return 0L
+        val from = player.currentPosition
+        seekTo(from + deltaMs)
+        return positionMs - from
+    }
+
+    fun seekTo(ms: Long) {
+        val player = controller ?: return
+        val max = player.duration.takeIf { it > 0 } ?: Long.MAX_VALUE
+        val target = ms.coerceIn(0L, max)
+        positionMs = target
+        player.seekTo(target)
+    }
+
+    fun beginScrubDragging() {
+        if (scrubDragging) return
+        val player = controller
+        resumePlayAfterScrub = player?.isPlaying == true
+        if (resumePlayAfterScrub) player?.pause()
+        scrubDragging = true
+    }
+
+
+    fun endScrubDragging(seekMs: Long? = null) {
+        if (!scrubDragging) return
+        val player = controller
+        val resume = resumePlayAfterScrub
+        resumePlayAfterScrub = false
+        scrubDragging = false
+        scrubPreviewMs = null
+        if (seekMs != null) seekTo(seekMs)
+        if (resume) player?.play()
+    }
+
+
+    fun beginHoldSpeed(): Boolean {
+        val player = controller ?: return false
+        if (scrubDragging || speedBeforeHold != null) return false
+        if (!player.isPlaying) return false
+        speedBeforeHold = player.playbackParameters.speed
+        holdSpeedActive = true
+        previewSpeed(2f)
+        return true
+    }
+
+    fun endHoldSpeed() {
+        val restore = speedBeforeHold ?: return
+        speedBeforeHold = null
+        holdSpeedActive = false
+        previewSpeed(restore)
+    }
+
+
+    fun previewSpeed(value: Float) {
+        val player = controller ?: return
+        val s = PlaybackSpeed.snap(value)
+        if (player.playbackParameters.speed != s) player.setPlaybackSpeed(s)
+        speed = s
+    }
+
+    
+
+
+
+
+    fun commitSpeed(value: Float) {
+        previewSpeed(value)
+        val s = PlaybackSpeed.snap(value)
+        if (!PlaybackSpeed.remember) return
+        if (PlaybackSpeed.isNormal(s) && !PlaybackSpeed.isNormal(PlaybackSpeed.saved)) PlaybackSpeed.setRemember(false, 1f)
+        else PlaybackSpeed.save(s)
+    }
+
+    fun toggleRememberSpeed() = PlaybackSpeed.setRemember(!PlaybackSpeed.remember, speed)
+
+
+    fun setAudioOnly(on: Boolean) {
+        AudioOnly.set(on)
+        applyVideoTrack()
+    }
+
+    
+
+
+
+
+    fun setBackground(background: Boolean) {
+        if (wantBackground == background) return
+        wantBackground = background
+        if (isMusicMode) return
+        applyVideoTrack()
+    }
+
+    
+
+
+
+
+
+    private var wantBackground = false
+
+
+    private fun applyVideoTrack() {
+        runCatching {
+            // Music keeps its video track alive in the background. Toggling it off and on
+            // made the decoder re-init, which is the audible dip heard when reopening the
+            // app during background playback.
+            if (isMusicMode) return
+            val off = AudioOnly.enabled || wantBackground
+            val player = controller ?: return
+            if (player.trackSelectionParameters.disabledTrackTypes.contains(androidx.media3.common.C.TRACK_TYPE_VIDEO) == off) return
+            Log.i(TAG, if (off) "video off (${if (AudioOnly.enabled) "audio only" else "background"})" else "video on")
+            player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
+                .setTrackTypeDisabled(androidx.media3.common.C.TRACK_TYPE_VIDEO, off)
+                .build()
+        }
+    }
+
+    fun close() {
+        loadJob?.cancel()
+        controller?.run { stop(); clearMediaItems() }
+        chatReplay.reset()
+        playedHistory.clear()
+        queue = emptyList()
+        expanded = false
+        fullscreen = false
+        portraitFullscreen = false
+        sheet = null
+        current = null
+        details = null
+        error = null
+        loading = false
+    }
+
+    
+
+
+
+
+    internal fun onConnected() {
+        syncFromPlayer()
+        applyVideoTrack()
+        controller?.videoSize?.let(::takeVideoSize)
+        pendingStart?.let { pendingStart = null; startPlayback(it); return }
+        val player = controller ?: return
+        rebuildQueue()
+        val playing = player.currentMediaItem ?: return
+        if (current != null || playing.mediaId.isBlank()) return
+        val meta = playing.mediaMetadata
+        val item = VideoItem(
+            id = playing.mediaId,
+            title = meta.title?.toString().orEmpty(),
+            channel = meta.artist?.toString().orEmpty(),
+            channelUrl = null,
+            thumbnail = meta.artworkUri?.toString(),
+            avatar = null,
+            durationSec = player.duration.takeIf { it > 0 }?.div(1000) ?: 0L,
+            views = -1,
+            uploaded = null,
+        )
+        current = item
+        loadJob = scope.launch {
+            runCatching { YouTube.details(item.id) }.onSuccess { details = it; current = it.item; refreshTracks() }
+        }
+    }
+
+    internal fun syncFromPlayer() {
+        val player = controller ?: return
+        isPlaying = player.isPlaying
+
+        isBuffering = player.playbackState == Player.STATE_BUFFERING || StreamRecovery.recovering == current?.id
+        positionMs = player.currentPosition.coerceAtLeast(0L)
+        bufferedMs = player.bufferedPosition.coerceAtLeast(0L)
+        durationMs = player.duration.takeIf { it > 0 } ?: ((current?.durationSec ?: 0L) * 1000L)
+        speed = player.playbackParameters.speed
+        loopEnabled = player.repeatMode == Player.REPEAT_MODE_ONE
+
+        if (selectedSubtitleLanguage != null && activeCues.isNotEmpty()) {
+            val pos = positionMs
+            // Latest-starting active cue wins (0.0.8-test3 fix round):
+            // YouTube VTT windows overlap, and rolling ASR captions emit
+            // cumulative versions of one line, so the earliest match is
+            // systematically the stale, least complete text. That single
+            // choice caused both the "late" and the "not full" reports.
+            captionText = activeCues.lastOrNull { pos in it.startMs..it.endMs }?.text
+        } else if (selectedSubtitleLanguage == null) {
+            captionText = null
+        }
+    }
+
+    internal val listener = object : Player.Listener {
+        override fun onEvents(player: Player, events: Player.Events) {
+            syncFromPlayer()
+            if (events.contains(Player.EVENT_TIMELINE_CHANGED) || events.contains(Player.EVENT_MEDIA_ITEM_TRANSITION)) rebuildQueue()
+        }
+
+        override fun onPlaybackStateChanged(playbackState: Int) {
+            if (playbackState == Player.STATE_ENDED) {
+                val p = controller ?: return
+                if (p.repeatMode == Player.REPEAT_MODE_ONE) return
+                if (p.currentMediaItemIndex + 1 < p.mediaItemCount) {
+                    // For music the "next" item is the auto-radio queue, so it
+                    // must respect the autoplay toggle (play one song and stop).
+                    if (!isMusicMode || autoPlayEnabled) {
+                        p.seekTo(p.currentMediaItemIndex + 1, 0L)
+                        p.play()
+                    }
+                } else if (autoPlayEnabled) {
+                    autoPlayNext()
+                }
+            }
+        }
+
+        override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+            if (mediaItem != null) onPlayerMovedTo(mediaItem)
+            val lang = selectedSubtitleLanguage
+            if (lang != null) {
+                setSubtitleLanguage(lang)
+            } else {
+                captionText = null
+                activeCues = emptyList()
+            }
+        }
+
+        override fun onCues(cueGroup: androidx.media3.common.text.CueGroup) {
+            // The side-loaded cue list is the ONLY caption source for VOD
+            // (0.0.8-test3, corrected by the pipeline map): media items
+            // carry no text track, so on VOD this callback never fires.
+            // It can still fire on live HLS; there the side-loaded list
+            // keeps ownership whenever it exists so the two writers never
+            // fight over the overlay.
+            if (activeCues.isNotEmpty()) return
+            val text = cueGroup.cues
+                .mapNotNull { cue -> cue.text?.toString()?.takeIf { it.isNotBlank() } }
+                .joinToString("\n")
+            if (text.isNotBlank()) {
+                captionText = text
+            }
+        }
+
+        override fun onVideoSizeChanged(videoSize: VideoSize) = takeVideoSize(videoSize)
+
+        override fun onTracksChanged(tracks: androidx.media3.common.Tracks) {
+            val vs = controller?.videoSize ?: return
+            if (vs.width <= 0 || vs.height <= 0) return
+            val w = (vs.width * vs.pixelWidthHeightRatio).roundToInt()
+            describeFormat(w, vs.height)
+        }
+
+        override fun onRenderedFirstFrame() {
+            Log.i("LokoTubeTime", "first frame +${android.os.SystemClock.elapsedRealtime() - openedAt}ms")
+            firstFrameRendered = true
+        }
+
+        override fun onAudioSessionIdChanged(audioSessionId: Int) {
+            AudioEffects.attach(audioSessionId)
+        }
+
+        override fun onPlayerError(e: PlaybackException) {
+            val status = (e.cause as? androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException)?.responseCode
+            Log.w(TAG, "playback error ${e.errorCodeName}${status?.let { " (HTTP $it)" } ?: ""} for ${current?.id}", e)
+
+            if (e.errorCode == PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS && StreamRecovery.recovering == current?.id) return
+            error = when (e.errorCode) {
+                PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
+                PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT -> I18n.t("error_no_connection", "Lost the connection. Check your network and try again.")
+                PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS -> I18n.t("error_stream_refused", "YouTube refused the stream. Try again.")
+                else -> I18n.t("error_unplayable", "This video couldn't be played.")
+            }
+        }
+    }
+
+    private fun takeVideoSize(videoSize: VideoSize) {
+        if (videoSize.width <= 0 || videoSize.height <= 0) return
+        videoAspect = videoSize.width * videoSize.pixelWidthHeightRatio / videoSize.height
+        aspectFromFrames = true
+
+        val w = (videoSize.width * videoSize.pixelWidthHeightRatio).roundToInt()
+        describeFormat(w, videoSize.height)
+    }
+
+
+    private fun describeFormat(width: Int, height: Int) {
+        val tier = qualityTier(width, height)
+        if (decodedHeight != tier) {
+            Log.i("LokoTubeTime", "now ${tier}p (${width}×${height}) at +${android.os.SystemClock.elapsedRealtime() - openedAt}ms")
+        }
+        decodedHeight = tier
+        val formats = controller?.currentTracks?.groups.orEmpty()
+            .filter { it.type == androidx.media3.common.C.TRACK_TYPE_VIDEO }
+            .flatMap { g -> (0 until g.length).map { g.getTrackFormat(it) } }
+        val format = formats.firstOrNull { it.height == height }
+        if (format == null) {
+            playingFormat = "${tier}p"
+            return
+        }
+        run {
+            val codec = when {
+                format.codecs?.startsWith("avc") == true -> "H.264"
+                format.codecs?.startsWith("vp9") == true || format.codecs?.startsWith("vp09") == true -> "VP9"
+                format.codecs?.startsWith("av01") == true -> "AV1"
+                else -> format.codecs ?: format.sampleMimeType ?: "?"
+            }
+            val auto = if (formats.size > 1) I18n.t("auto", "Auto") else null
+            val labelTier = qualityTier(format.width, format.height)
+            val codecText = format.codecs?.lowercase(java.util.Locale.US).orEmpty()
+            val hdr = format.colorInfo?.let {
+                it.colorTransfer == C.COLOR_TRANSFER_ST2084 || it.colorTransfer == C.COLOR_TRANSFER_HLG ||
+                    it.hdrStaticInfo != null
+            } == true || codecText.contains("vp09.02") || codecText.contains("vp9.2") ||
+                (codecText.startsWith("av01") &&
+                    (codecText.split('.').getOrNull(3)?.take(2)?.toIntOrNull() ?: 0) >= 10)
+            playingFormat = listOfNotNull(
+                auto,
+                "${labelTier}p",
+                if (hdr) "HDR" else null,
+                codec,
+                format.id?.substringAfterLast(":")?.let { "itag $it" },
+            ).joinToString(" · ")
+        }
+    }
+}
+
+@Composable
+fun rememberPlayerState(): PlayerState {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val state = remember { PlayerState(scope) }
+    // Same-process hooks for the playback notification's next/previous
+    // actions (consumed by PlaybackService's ForwardingPlayer).
+    PlayerNotificationHooks.onNext = { state.skipNext() }
+    PlayerNotificationHooks.onPrevious = { state.skipPrevious() }
+    DisposableEffect(context) {
+        val token = SessionToken(context, ComponentName(context, PlaybackService::class.java))
+        val future = MediaController.Builder(context, token).buildAsync()
+        future.addListener({
+            runCatching { future.get() }.getOrNull()?.let { controller ->
+                state.controller = controller
+                controller.addListener(state.listener)
+                state.onConnected()
+            }
+        }, ContextCompat.getMainExecutor(context))
+        onDispose {
+            state.controller?.removeListener(state.listener)
+            MediaController.releaseFuture(future)
+            state.controller = null
+        }
+    }
+
+    LaunchedEffect(state.isPlaying) {
+        while (isActive && state.isPlaying) {
+            state.syncFromPlayer()
+            delay(250)
+        }
+    }
+    return state
+}
+
+enum class PlayerSheet { Quality, Comments, Queue, Settings, Speed, Audio, Subtitles }
+
+private const val TAG = "LokoTube"

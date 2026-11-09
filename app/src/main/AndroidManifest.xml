@@ -124,7 +124,7 @@
             android:name=".DownloadCancelReceiver"
             android:exported="false">
             <intent-filter>
-                <action android:name="com.leplay.app.CANCEL_DOWNLOAD" />
+                <action android:name="com.lokotube.app.CANCEL_DOWNLOAD" />
             </intent-filter>
         </receiver>
 
