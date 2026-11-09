@@ -1615,8 +1615,12 @@ class PlayerState(private val scope: CoroutineScope) {
                 val p = controller ?: return
                 if (p.repeatMode == Player.REPEAT_MODE_ONE) return
                 if (p.currentMediaItemIndex + 1 < p.mediaItemCount) {
-                    p.seekTo(p.currentMediaItemIndex + 1, 0L)
-                    p.play()
+                    // For music the "next" item is the auto-radio queue, so it
+                    // must respect the autoplay toggle (play one song and stop).
+                    if (!isMusicMode || autoPlayEnabled) {
+                        p.seekTo(p.currentMediaItemIndex + 1, 0L)
+                        p.play()
+                    }
                 } else if (autoPlayEnabled) {
                     autoPlayNext()
                 }
