@@ -1,0 +1,12 @@
+LokoTube is a free, open-source app for Android that streams YouTube video and music without ads, tracking, or a Google account. It is a fork of LePlay by Levi Setiadi, rebranded and extended.
+
+Features:
+• Ad-free playback with SponsorBlock (skip sponsored segments) and Return YouTube Dislike.
+• Background playback and picture-in-picture.
+• A music mode with an auto-radio queue, and downloads as video, audio or MP3.
+• Local playlists with import/export (CSV subscriptions, JSON playlists) for backups and moving between devices.
+• An equalizer with presets and a home-screen mini-player widget.
+• Video chapters, in-playlist search and bulk downloads.
+• Indonesian and English translations with a clean light theme.
+
+LokoTube is built on the NewPipeExtractor library, so it needs no Google Play Services or account. It contains no ads and no trackers, and is licensed under GPL-3.0.
