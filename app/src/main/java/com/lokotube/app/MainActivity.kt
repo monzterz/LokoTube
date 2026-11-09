@@ -298,8 +298,10 @@ fun LokoTubeApp() {
     val appContext = LocalContext.current
 
     LaunchedEffect(Unit) {
-        kotlinx.coroutines.delay(1_400)
-        updateState.check()
+        if (BuildConfig.UPDATES_ENABLED) {
+            kotlinx.coroutines.delay(1_400)
+            updateState.check()
+        }
     }
     LaunchedEffect(updateState.message) {
         updateState.message?.let { message ->

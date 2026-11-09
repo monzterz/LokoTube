@@ -17,6 +17,18 @@ android {
         versionName = "0.1.4"
     }
 
+    flavorDimensions += "channel"
+    productFlavors {
+        create("github") {
+            dimension = "channel"
+            buildConfigField("boolean", "UPDATES_ENABLED", "true")
+        }
+        create("fdroid") {
+            dimension = "channel"
+            buildConfigField("boolean", "UPDATES_ENABLED", "false")
+        }
+    }
+
     signingConfigs {
         create("release") {
             val props = Properties()

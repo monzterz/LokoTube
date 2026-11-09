@@ -322,7 +322,7 @@ fun SettingsScreen(
                         onClick = { activeFloatingSection = SettingsFloatingSection.VERSION_HISTORY },
                         padded = false,
                     )
-                    SettingsRow(
+                    if (BuildConfig.UPDATES_ENABLED) SettingsRow(
                         icon = Icons.Rounded.FileDownload,
                         title = I18n.t("check_updates", "Check for updates"),
                         subtitle = I18n.t("check_updates_sub", "New GitHub releases install from inside the app"),

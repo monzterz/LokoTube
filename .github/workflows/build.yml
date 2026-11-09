@@ -38,13 +38,13 @@ jobs:
       - name: Build debug APK
         run: |
           chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon
+          ./gradlew assembleGithubDebug --no-daemon
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
           name: lokotube-debug
-          path: app/build/outputs/apk/debug/*.apk
+          path: app/build/outputs/apk/github/debug/*.apk
 
       - name: Build signed release APK (tag only)
         if: startsWith(github.ref, 'refs/tags/')
@@ -55,8 +55,8 @@ jobs:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           echo "$KEYSTORE_FILE_BASE64" | base64 -d > app/release.keystore
-          ./gradlew assembleRelease --no-daemon
-          cp app/build/outputs/apk/release/app-release.apk "LokoTube-${GITHUB_REF_NAME#v}.apk"
+          ./gradlew assembleGithubRelease --no-daemon
+          cp app/build/outputs/apk/github/release/app-github-release.apk "LokoTube-${GITHUB_REF_NAME#v}.apk"
 
       - name: Attach APK to GitHub Release (tag only)
         if: startsWith(github.ref, 'refs/tags/')
