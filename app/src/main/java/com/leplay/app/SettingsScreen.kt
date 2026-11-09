@@ -250,6 +250,12 @@ fun SettingsScreen(
                         onClick = { activeFloatingSection = SettingsFloatingSection.GENERAL_MODS },
                         padded = false,
                     )
+                    SettingsRow(
+                        icon = Icons.Rounded.MusicNote,
+                        title = I18n.t("equalizer", "Equalizer"),
+                        subtitle = I18n.t("equalizer_sub", "Adjust bass, treble & presets"),
+                        onClick = { activeFloatingSection = SettingsFloatingSection.EQUALIZER },
+                    )
                 }
 
                 SettingsSectionHeader(I18n.t("language_section", "Language"))
@@ -347,6 +353,13 @@ fun SettingsScreen(
                         padded = false,
                     )
                     SettingsRow(
+                        icon = Icons.Rounded.Info,
+                        title = I18n.t("feedback", "Kirim Masukan"),
+                        subtitle = I18n.t("feedback_sub", "Lapor bug atau minta fitur (GitHub)"),
+                        onClick = { openRepo(leplayRepo + "/issues/new") },
+                        padded = false,
+                    )
+                    SettingsRow(
                         icon = Icons.Rounded.Person,
                         title = I18n.t("developer", "Developer"),
                         subtitle = "Levi Setiadi mod by Lokotre",
@@ -434,6 +447,15 @@ fun SettingsScreen(
                         onDismiss = { activeFloatingSection = null },
                     ) {
                         VersionHistoryContent()
+                    }
+                }
+                SettingsFloatingSection.EQUALIZER -> {
+                    SettingsFloatingDialog(
+                        title = I18n.t("equalizer", "Equalizer"),
+                        subtitle = I18n.t("equalizer_sub", "Adjust bass, treble & presets"),
+                        onDismiss = { activeFloatingSection = null },
+                    ) {
+                        EqualizerContent()
                     }
                 }
                 SettingsFloatingSection.SUPPORT -> {
@@ -671,6 +693,35 @@ private enum class SettingsFloatingSection {
     LANGUAGE,
     VERSION_HISTORY,
     SUPPORT,
+    EQUALIZER,
+}
+
+@Composable
+private fun EqualizerContent() {
+    val c = MaterialTheme.colorScheme
+    val names = remember { AudioEffects.presetNames() }
+    val current = AudioEffects.presetIndex
+    val all = listOf(I18n.t("eq_off", "Nonaktif (suara asli)")) + names
+    Column(Modifier.padding(vertical = 8.dp)) {
+        all.forEachIndexed { i, name ->
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .pressable { AudioEffects.setPreset(i) }
+                    .padding(horizontal = 20.dp, vertical = 13.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    name,
+                    Modifier.weight(1f),
+                    color = if (current == i) c.primary else c.onSurface,
+                    fontSize = 15.sp,
+                    fontWeight = if (current == i) FontWeight.SemiBold else FontWeight.Normal,
+                )
+                if (current == i) Icon(Icons.Rounded.Check, null, tint = c.primary, modifier = Modifier.size(20.dp))
+            }
+        }
+    }
 }
 
 @Composable

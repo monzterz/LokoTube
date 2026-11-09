@@ -54,6 +54,7 @@ class LePlayApplication : Application(), ImageLoaderFactory {
         SearchHistory.init(this)
         Downloads.init(this)
         LocalPlaylists.init(this)
+        AudioEffects.load()
 
         getSystemService(android.net.ConnectivityManager::class.java)?.registerDefaultNetworkCallback(
             object : android.net.ConnectivityManager.NetworkCallback() {

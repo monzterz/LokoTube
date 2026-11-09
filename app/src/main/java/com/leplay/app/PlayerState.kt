@@ -1668,6 +1668,10 @@ class PlayerState(private val scope: CoroutineScope) {
             firstFrameRendered = true
         }
 
+        override fun onAudioSessionIdChanged(audioSessionId: Int) {
+            AudioEffects.attach(audioSessionId)
+        }
+
         override fun onPlayerError(e: PlaybackException) {
             val status = (e.cause as? androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException)?.responseCode
             Log.w(TAG, "playback error ${e.errorCodeName}${status?.let { " (HTTP $it)" } ?: ""} for ${current?.id}", e)
