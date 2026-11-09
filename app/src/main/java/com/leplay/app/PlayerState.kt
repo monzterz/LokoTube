@@ -713,7 +713,10 @@ class PlayerState(private val scope: CoroutineScope) {
                     known[item.id] = d.item
                     d.related.forEach { known[it.id] = it }
                     if (!d.playable) error = I18n.t("no_playable_stream", "No playable stream was found for this video.")
-                    else if (startPlayback) startPlayback(d.item)
+                    else {
+                        if (startPlayback) startPlayback(d.item)
+                        primeUpNextMusic()
+                    }
 
                     scope.launch(kotlinx.coroutines.Dispatchers.IO) {
                         val dislikes = fetchDislikeCount(item.id)
@@ -782,6 +785,11 @@ class PlayerState(private val scope: CoroutineScope) {
             swapping = true
             try {
                 val index = player.currentMediaItemIndex
+                // Drop stale up-next so a manual music switch starts a clean
+                // queue (video keeps its add-to-queue items).
+                if (isMusicMode && player.mediaItemCount > index + 1) {
+                    player.removeMediaItems(index + 1, player.mediaItemCount)
+                }
                 player.addMediaItem(index + 1, mediaItemFor(item))
                 player.seekTo(index + 1, positionMs)
                 player.removeMediaItem(index)
@@ -792,6 +800,26 @@ class PlayerState(private val scope: CoroutineScope) {
         player.prepare()
     }
 
+    /** Pre-buffers the next music track by adding it to the player's
+     *  playlist right after the current item, so ExoPlayer fetches its
+     *  audio ahead of time and the next transition starts instantly. */
+    private fun primeUpNextMusic() {
+        if (!isMusicMode) return
+        val player = controller ?: return
+        val next = musicQueue.firstOrNull() ?: return
+        val id = next.id
+        scope.launch {
+            val ok = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                runCatching { StreamCache.getOrLoad(id) }.getOrNull() != null
+            }
+            if (!ok || !isMusicMode || controller !== player) return@launch
+            if (current?.id == id) return@launch
+            if (player.currentMediaItemIndex + 1 >= player.mediaItemCount) {
+                known[id] = next
+                player.addMediaItem(mediaItemFor(next))
+            }
+        }
+    }
 
     fun playNext(item: VideoItem) {
         val player = controller ?: return
@@ -1091,6 +1119,10 @@ class PlayerState(private val scope: CoroutineScope) {
         if (swapping || media.mediaId.isBlank()) return
 
         if (player.currentMediaItemIndex > 0) player.removeMediaItems(0, player.currentMediaItemIndex)
+        // Keep the logical music queue in sync with the player's auto-advance.
+        if (isMusicMode && musicQueue.firstOrNull()?.id == media.mediaId) {
+            musicQueue = musicQueue.drop(1)
+        }
         if (media.mediaId != current?.id) show(itemFor(media), startPlayback = false)
     }
 
