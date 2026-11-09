@@ -220,6 +220,14 @@ fun MusicScreen(
     LaunchedEffect(state.loading, state.recentPlays.size, state.likedTracks.size, state.shelves.size) {
         if (!state.loading) listState.scrollToItem(0, 0)
     }
+
+    // Warm the stream info for the first few visible tracks so switching
+    // to one of them skips the cold extraction round-trip.
+    LaunchedEffect(state.recentPlays, state.likedTracks) {
+        (state.recentPlays.take(5) + state.likedTracks.take(3))
+            .distinctBy { it.id }
+            .forEach { StreamCache.prefetch(it.id) }
+    }
     val context = LocalContext.current
 
     var trackOptionsFor by remember { mutableStateOf<VideoItem?>(null) }
@@ -974,6 +982,12 @@ private fun DedicatedMusicSearchView(
 
     LaunchedEffect(Unit) {
         focusRequester.requestFocus()
+    }
+
+    // Pre-fetch the stream info of the top results so tapping a song
+    // starts playback without paying the cold extraction round-trip.
+    LaunchedEffect(results) {
+        results.take(5).forEach { StreamCache.prefetch(it.id) }
     }
 
     Column(
