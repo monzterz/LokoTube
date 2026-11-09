@@ -85,6 +85,7 @@ import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.Security
 import androidx.compose.material.icons.rounded.Storage
 import androidx.compose.material.icons.rounded.SystemUpdate
@@ -350,6 +351,27 @@ fun SettingsScreen(
                         title = I18n.t("open_source", "Open Source"),
                         subtitle = I18n.t("open_source_sub", "View source code on GitHub"),
                         onClick = { openRepo(leplayRepo) },
+                        padded = false,
+                    )
+                    SettingsRow(
+                        icon = Icons.Rounded.Share,
+                        title = I18n.t("share_app", "Bagikan LokoTube"),
+                        subtitle = I18n.t("share_app_sub", "Kirim tautan unduhan ke teman"),
+                        onClick = {
+                            runCatching {
+                                val text = I18n.t(
+                                    "share_app_message",
+                                    "LokoTube — ad-free YouTube & YouTube Music. Download here:"
+                                ) + "\n" + leplayRepo + "/releases/latest"
+                                val send = Intent(Intent.ACTION_SEND).apply {
+                                    type = "text/plain"
+                                    putExtra(Intent.EXTRA_TEXT, text)
+                                }
+                                context.startActivity(
+                                    Intent.createChooser(send, I18n.t("share_app", "Bagikan LokoTube"))
+                                )
+                            }
+                        },
                         padded = false,
                     )
                     SettingsRow(
