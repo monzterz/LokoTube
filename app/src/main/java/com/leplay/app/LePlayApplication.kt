@@ -53,6 +53,7 @@ class LePlayApplication : Application(), ImageLoaderFactory {
         SponsorBlock.init(this)
         SearchHistory.init(this)
         Downloads.init(this)
+        LocalPlaylists.init(this)
 
         getSystemService(android.net.ConnectivityManager::class.java)?.registerDefaultNetworkCallback(
             object : android.net.ConnectivityManager.NetworkCallback() {

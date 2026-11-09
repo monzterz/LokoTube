@@ -688,6 +688,7 @@ fun LibraryScreen(
     onOpenPlaylist: (PlaylistRef) -> Unit,
     onOpenChannel: (String) -> Unit = {},
     onOpenAllSubscriptions: () -> Unit = {},
+    onOpenLocalPlaylists: () -> Unit = {},
     onOpenHistory: () -> Unit = {},
     onSearch: () -> Unit,
     onSignIn: () -> Unit,
@@ -833,6 +834,31 @@ fun LibraryScreen(
                         row.forEach { pl -> PlaylistTile(pl, Modifier.weight(1f)) { onOpenPlaylist(pl) } }
                         if (row.size == 1) Spacer(Modifier.weight(1f))
                     }
+                }
+            }
+
+            item(key = "localPlaylists") {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .pressable(onClick = onOpenLocalPlaylists)
+                        .padding(horizontal = 16.dp, vertical = 13.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(Icons.Rounded.VideoLibrary, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.width(14.dp))
+                    Text(
+                        I18n.t("local_playlists", "Local playlists"),
+                        modifier = Modifier.weight(1f),
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 15.sp,
+                    )
+                    Text(
+                        LocalPlaylists.playlists.size.toString(),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 13.sp,
+                    )
+                    Text("  ›", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 15.sp)
                 }
             }
         }

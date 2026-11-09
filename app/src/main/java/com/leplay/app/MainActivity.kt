@@ -272,6 +272,7 @@ fun LePlayTubeApp() {
     var openChannel by remember { mutableStateOf<String?>(null) }
     var shortsEntry by remember { mutableStateOf<VideoItem?>(null) }
     var openAllSubscriptions by remember { mutableStateOf(false) }
+    var openLocalPlaylists by remember { mutableStateOf(false) }
     var openHistory by remember { mutableStateOf(false) }
     var openSearch by remember { mutableStateOf(false) }
     var tab by rememberSaveable { mutableStateOf(Tab.Home) }
@@ -463,6 +464,7 @@ fun LePlayTubeApp() {
     BackHandler(enabled = !showFullscreen && player.expanded) { player.expanded = false }
     BackHandler(enabled = !player.expanded && openSettings) { openSettings = false }
     BackHandler(enabled = !player.expanded && openAllSubscriptions && openChannel == null) { openAllSubscriptions = false }
+    BackHandler(enabled = !player.expanded && openLocalPlaylists) { openLocalPlaylists = false }
     BackHandler(enabled = !player.expanded && openHistory) { openHistory = false }
     BackHandler(enabled = !player.expanded && tab != Tab.Home && openPlaylist == null && openChannel == null && !openAllSubscriptions) {
         if (tab == Tab.Shorts && isShortsPlaying && pip.supported) {
@@ -484,7 +486,7 @@ fun LePlayTubeApp() {
     }
     BackHandler(enabled = updateState.visible) { updateState.dismiss() }
 
-    val canHandleRootBack = !player.expanded && !openSettings && !openAllSubscriptions &&
+    val canHandleRootBack = !player.expanded && !openSettings && !openAllSubscriptions && !openLocalPlaylists &&
         tab == Tab.Home && openPlaylist == null && openChannel == null &&
         !openSearch && !signingIn && !showFullscreen && shortsEntry == null && !updateState.visible
     BackHandler(enabled = canHandleRootBack) {
@@ -648,6 +650,7 @@ fun LePlayTubeApp() {
                         openChannel = url
                     },
                     onOpenAllSubscriptions = { openAllSubscriptions = true },
+                    onOpenLocalPlaylists = { openLocalPlaylists = true },
                     onOpenHistory = { openHistory = true },
                     onSearch = { openSearch = true },
                     onSignIn = { signingIn = true }, onAccount = { openSettings = true },
@@ -710,6 +713,18 @@ fun LePlayTubeApp() {
                 channels = lib.channels,
                 contentPadding = contentPadding,
                 onBack = { openAllSubscriptions = false },
+            )
+        }
+
+
+        AnimatedVisibility(
+            visible = openLocalPlaylists,
+            enter = if (reduced) fadeIn(snap()) else slideInHorizontally(tween(340, easing = Motion.Emphasized)) { it } + fadeIn(tween(120)),
+            exit = if (reduced) fadeOut(snap()) else slideOutHorizontally(tween(300, easing = Motion.Emphasized)) { it } + fadeOut(tween(220)),
+        ) {
+            LocalPlaylistsScreen(
+                contentPadding = contentPadding,
+                onBack = { openLocalPlaylists = false },
             )
         }
 

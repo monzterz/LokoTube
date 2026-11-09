@@ -70,6 +70,8 @@ import androidx.compose.ui.zIndex
 import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import android.widget.Toast
+import androidx.compose.material.icons.rounded.BookmarkAdd
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -83,33 +85,55 @@ import androidx.compose.ui.unit.sp
 fun VideoOptionsSheet(video: VideoItem, player: PlayerState, onDismiss: () -> Unit) {
     val c = MaterialTheme.colorScheme
     val context = LocalContext.current
+    var picking by remember { mutableStateOf(false) }
+    val list = LocalPlaylists.playlists
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = c.surfaceContainerLow,
     ) {
-        Row(Modifier.padding(horizontal = 20.dp).padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Thumbnail(video.thumbnail, Modifier.width(112.dp).aspectRatio(16f / 9f), radius = 14)
-            Spacer(Modifier.width(14.dp))
-            Column(Modifier.weight(1f)) {
-                Text(video.title, fontWeight = FontWeight.Bold, fontSize = 15.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                Text(video.channel, color = c.onSurfaceVariant, fontSize = 13.sp, maxLines = 1)
+        if (picking) {
+            Row(Modifier.padding(horizontal = 24.dp).padding(bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(I18n.t("save_to_local_playlist", "Save to playlist"), fontFamily = RoundedHeavy, fontWeight = FontWeight.ExtraBold, fontSize = 18.sp)
             }
+            list.forEach { pl ->
+                OptionRow(Icons.AutoMirrored.Rounded.PlaylistPlay, pl.title) {
+                    val added = LocalPlaylists.add(pl.id, LocalSavedVideo(video.id, video.title, video.channel, video.thumbnail))
+                    Toast.makeText(context, if (added) I18n.t("saved_to_playlist", "Saved") else I18n.t("already_in_playlist", "Already in this playlist"), Toast.LENGTH_SHORT).show()
+                    onDismiss()
+                }
+            }
+            OptionRow(Icons.AutoMirrored.Rounded.PlaylistAdd, I18n.t("local_pl_new", "New playlist")) {
+                val pl = LocalPlaylists.create(I18n.t("local_pl_default_name", "Playlist {n}").replace("{n}", (LocalPlaylists.playlists.size + 1).toString()))
+                LocalPlaylists.add(pl.id, LocalSavedVideo(video.id, video.title, video.channel, video.thumbnail))
+                onDismiss()
+            }
+            Spacer(Modifier.height(24.dp))
+        } else {
+            Row(Modifier.padding(horizontal = 20.dp).padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Thumbnail(video.thumbnail, Modifier.width(112.dp).aspectRatio(16f / 9f), radius = 14)
+                Spacer(Modifier.width(14.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(video.title, fontWeight = FontWeight.Bold, fontSize = 15.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    Text(video.channel, color = c.onSurfaceVariant, fontSize = 13.sp, maxLines = 1)
+                }
+            }
+            OptionRow(Icons.AutoMirrored.Rounded.PlaylistPlay, I18n.t("play_next", "Play next")) { player.playNext(video); onDismiss() }
+            OptionRow(Icons.AutoMirrored.Rounded.PlaylistAdd, I18n.t("add_to_queue", "Add to queue")) { player.addToQueue(video); onDismiss() }
+            OptionRow(Icons.Rounded.Download, I18n.t("download", "Download")) { player.downloadFor = video; onDismiss() }
+            OptionRow(Icons.Rounded.BookmarkAdd, I18n.t("save_to_local_playlist", "Save to playlist")) { picking = true }
+            if (Account.signedIn) {
+                OptionRow(Icons.Rounded.WatchLater, I18n.t("save_to_watch_later", "Save to Watch later")) { player.saveToWatchLater(video); onDismiss() }
+            }
+            OptionRow(Icons.Rounded.Share, I18n.t("share", "Share")) {
+                val send = Intent(Intent.ACTION_SEND).setType("text/plain")
+                    .putExtra(Intent.EXTRA_TEXT, "https://youtu.be/${video.id}")
+                    .putExtra(Intent.EXTRA_SUBJECT, video.title)
+                context.startActivity(Intent.createChooser(send, null))
+                onDismiss()
+            }
+            Spacer(Modifier.height(24.dp))
         }
-        OptionRow(Icons.AutoMirrored.Rounded.PlaylistPlay, I18n.t("play_next", "Play next")) { player.playNext(video); onDismiss() }
-        OptionRow(Icons.AutoMirrored.Rounded.PlaylistAdd, I18n.t("add_to_queue", "Add to queue")) { player.addToQueue(video); onDismiss() }
-        OptionRow(Icons.Rounded.Download, I18n.t("download", "Download")) { player.downloadFor = video; onDismiss() }
-        if (Account.signedIn) {
-            OptionRow(Icons.Rounded.WatchLater, I18n.t("save_to_watch_later", "Save to Watch later")) { player.saveToWatchLater(video); onDismiss() }
-        }
-        OptionRow(Icons.Rounded.Share, I18n.t("share", "Share")) {
-            val send = Intent(Intent.ACTION_SEND).setType("text/plain")
-                .putExtra(Intent.EXTRA_TEXT, "https://youtu.be/${video.id}")
-                .putExtra(Intent.EXTRA_SUBJECT, video.title)
-            context.startActivity(Intent.createChooser(send, null))
-            onDismiss()
-        }
-        Spacer(Modifier.height(24.dp))
     }
 }
 
