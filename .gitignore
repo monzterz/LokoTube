@@ -9,6 +9,7 @@ captures/
 
 local.properties
 keystore.properties
+CATATAN-PROYEK.md
 *.jks
 *.keystore
 *.apk
