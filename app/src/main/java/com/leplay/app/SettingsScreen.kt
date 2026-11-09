@@ -895,6 +895,9 @@ private fun VersionHistoryContent() {
     // the release list from GitHub and force-closed when its LazyColumn was
     // measured inside the scrolling dialog. A static list cannot crash.
     val entries = listOf(
+        Triple("0.1.2", "9 Nov 2026", "Chapter/titik waktu video, unduh massal (multi-select + peringatan ukuran), saklar radio/autoplay (putar satu lagu & berhenti), cari di dalam playlist, equalizer preset, form umpan-balik GitHub, widget mini player (mundur/putar-jeda/maju/perluas/tutup), kontrol player tanpa delay, sinkronisasi otomatis dengan LePlay."),
+        Triple("0.1.1", "9 Nov 2026", "Tema Flat Light, terjemahan Indonesia lengkap, impor/ekspor langganan (CSV) + playlist lokal (JSON), perbaikan player dari LePlay (tap langsung ke kontrol, pindah lagu instan lewat prefetch + pre-buffer audio)."),
+        Triple("0.1.0", "9 Nov 2026", "Rilis pertama LokoTube: rebrand penuh (warna teal, ikon LOKO, pembersihan nama), kredit Levi Setiadi, donasi pengembang, build rilis otomatis via GitHub Actions."),
         Triple("0.0.7", "8 Nov 2026", "Music engine (Package A): queue, auto radio, queue panel, prev/next everywhere. Autoplay follows the on-screen Up Next list, endless related videos, search sort chips, MP3 audio-only downloads, double-tap seek without the controls flashing, new icon, single Liquid Glass switch, TV and tablet polish, voice search."),
         Triple("0.0.6", "8 Nov 2026", "Lite Mode, live chat and comments panels fixed, next/previous video buttons, responsive player buttons, animation pass."),
         Triple("0.0.5", "7 Nov 2026", "Indonesian by default, full Indonesian/English UI dictionaries, selectable descriptions, rb/jt/M number formats."),
