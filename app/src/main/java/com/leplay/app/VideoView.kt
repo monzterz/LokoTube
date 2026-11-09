@@ -190,6 +190,29 @@ fun VideoContent(
 
 
     var controlsVisible by remember { mutableStateOf(false) }
+    // Center cluster delay (0.0.9, user request via rizkyckz): while the
+    // video is playing, the prev/play/next cluster fades in about a second
+    // after the rest of the chrome, so a double-tap seek never flashes the
+    // navigation buttons. Paused, the cluster is instant: it is the primary
+    // control then. The bars and scrubber are never delayed.
+    var centerReady by remember { mutableStateOf(false) }
+    // Keyed on controlsVisible ONLY, deliberately: while the controls are
+    // up and the video plays, isPlaying flaps on every seek buffering
+    // (PlayerState mirrors ExoPlayer.isPlaying, false during rebuffer), and
+    // re-keying on it cancelled the pending delay and set centerReady
+    // instantly through the paused branch (0.0.9-test1 device finding: the
+    // delay never happened). The paused check is sampled once, at the
+    // moment the controls appear.
+    LaunchedEffect(controlsVisible) {
+        if (!controlsVisible) {
+            centerReady = false
+        } else if (!state.isPlaying || TvMode.isTv) {
+            centerReady = true
+        } else {
+            delay(1_000)
+            centerReady = true
+        }
+    }
     var touchedAt by remember { mutableLongStateOf(0L) }
     fun touched() { touchedAt = System.nanoTime() }
     SideEffect { state.videoControlsVisible = controlsVisible }
@@ -773,7 +796,7 @@ fun VideoContent(
                     }
                 }
                 Row(
-                    modifier = Modifier.align(Alignment.Center),
+                    modifier = Modifier.align(Alignment.Center).graphicsLayer { alpha = if (centerReady) 1f else 0f },
                     horizontalArrangement = Arrangement.spacedBy(clusterGap),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
