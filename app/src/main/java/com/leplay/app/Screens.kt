@@ -42,7 +42,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Upload
+import androidx.compose.material3.IconButton
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.CloudOff
 import androidx.compose.material.icons.rounded.Download
@@ -567,7 +572,57 @@ fun AllSubscriptionsScreen(
     onBack: () -> Unit,
 ) {
     val c = MaterialTheme.colorScheme
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val openChannel = LocalChannelOpener.current
+    var importMsg by remember { mutableStateOf<String?>(null) }
+
+    val exportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("text/csv")
+    ) { uri ->
+        if (uri != null) {
+            runCatching {
+                context.contentResolver.openOutputStream(uri)?.use { os ->
+                    os.write(SubscriptionTransfer.exportCsv(channels).toByteArray(Charsets.UTF_8))
+                }
+                Toast.makeText(context, I18n.t("export_done", "Subscriptions exported"), Toast.LENGTH_SHORT).show()
+            }.onFailure {
+                Toast.makeText(context, I18n.t("export_failed", "Export failed"), Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    val importLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            val text = runCatching {
+                context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
+            }.getOrNull()
+            val ids = if (text.isNullOrBlank()) emptyList() else SubscriptionTransfer.parseChannelIds(text)
+            if (ids.isEmpty()) {
+                Toast.makeText(context, I18n.t("import_none", "No valid channels found in file"), Toast.LENGTH_SHORT).show()
+            } else {
+                val existing = channels.map { it.id.trim() }.toSet()
+                val progressBase = I18n.t("import_progress", "Importing {done}/{total}…")
+                importMsg = progressBase.replace("{done}", "0").replace("{total}", ids.size.toString())
+                scope.launch {
+                    val res = SubscriptionTransfer.import(ids, existing) { done, total ->
+                        importMsg = progressBase.replace("{done}", done.toString()).replace("{total}", total.toString())
+                    }
+                    importMsg = null
+                    Toast.makeText(
+                        context,
+                        I18n.t("import_done", "Done: {added} added, {failed} failed")
+                            .replace("{added}", res.added.toString())
+                            .replace("{failed}", res.failed.toString()),
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
+        }
+    }
+
     Box(Modifier.fillMaxSize().background(c.surface)) {
         Column(Modifier.fillMaxSize()) {
             BackScreenHeader(onBack = onBack) {
@@ -580,6 +635,23 @@ fun AllSubscriptionsScreen(
                     letterSpacing = (-0.8).sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
+                )
+                IconButton(
+                    onClick = { exportLauncher.launch("lokotube-subscriptions.csv") },
+                    enabled = channels.isNotEmpty(),
+                ) {
+                    Icon(Icons.Rounded.Download, I18n.t("export_subscriptions", "Export subscriptions"), tint = c.onSurface)
+                }
+                IconButton(onClick = { importLauncher.launch(arrayOf("*/*")) }) {
+                    Icon(Icons.Rounded.Upload, I18n.t("import_subscriptions", "Import subscriptions"), tint = c.onSurface)
+                }
+            }
+            importMsg?.let {
+                Text(
+                    it,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                    color = c.primary,
+                    fontSize = 13.sp,
                 )
             }
             LazyColumn(contentPadding = contentPadding) {
