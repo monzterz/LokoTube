@@ -35,6 +35,8 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
@@ -228,6 +230,9 @@ fun MusicScreen(
             .distinctBy { it.id }
             .forEach { StreamCache.prefetch(it.id) }
     }
+
+    PrefetchVisibleTracks(listState, state.recentPlays, "recent_")
+    PrefetchVisibleTracks(listState, state.likedTracks, "liked_")
     val context = LocalContext.current
 
     var trackOptionsFor by remember { mutableStateOf<VideoItem?>(null) }
@@ -956,6 +961,28 @@ private fun MusicTrackSquareCard(
     }
 }
 
+/** Prefetches the stream info of tracks that scroll into view, so tapping
+ *  any visible song plays without a cold extraction round-trip. */
+@Composable
+private fun PrefetchVisibleTracks(
+    listState: androidx.compose.foundation.lazy.LazyListState,
+    tracks: List<VideoItem>,
+    keyPrefix: String,
+) {
+    LaunchedEffect(listState, tracks) {
+        val byId = tracks.associateBy { it.id }
+        snapshotFlow { listState.layoutInfo.visibleItemsInfo.mapNotNull { it.key as? String } }
+            .distinctUntilChanged()
+            .collect { keys ->
+                keys.forEach { key ->
+                    if (key.startsWith(keyPrefix)) {
+                        byId[key.removePrefix(keyPrefix)]?.let { StreamCache.prefetch(it.id) }
+                    }
+                }
+            }
+    }
+}
+
 @Composable
 private fun DedicatedMusicSearchView(
     query: String,
@@ -973,6 +1000,7 @@ private fun DedicatedMusicSearchView(
     val isDark = isDarkTheme()
     val isAmoled = ThemeSettings.mode == "amoled"
     val focusRequester = remember { FocusRequester() }
+    val searchListState = rememberLazyListState()
     val keyboardController = LocalSoftwareKeyboardController.current
     val startVoiceSearch = rememberVoiceSearchLauncher { text ->
         onQueryChange(text)
@@ -989,6 +1017,8 @@ private fun DedicatedMusicSearchView(
     LaunchedEffect(results) {
         results.take(5).forEach { StreamCache.prefetch(it.id) }
     }
+
+    PrefetchVisibleTracks(searchListState, results, "sr_")
 
     Column(
         Modifier
@@ -1111,6 +1141,7 @@ private fun DedicatedMusicSearchView(
                 val wideSearchList = TvMode.isTv || LocalConfiguration.current.screenWidthDp >= 640
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
                 LazyColumn(
+                    state = searchListState,
                     modifier = if (wideSearchList) {
                         Modifier.fillMaxHeight().widthIn(max = 860.dp)
                     } else {
