@@ -54,7 +54,7 @@
             </intent-filter>
 
             <!-- YouTube web URLs (plain BROWSABLE: the system chooser
-                 offers LePlay beside the official app) -->
+                 offers LokoTube beside the official app) -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
