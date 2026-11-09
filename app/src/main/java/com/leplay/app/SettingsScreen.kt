@@ -99,6 +99,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
@@ -723,8 +724,32 @@ private fun EqualizerContent() {
     val c = MaterialTheme.colorScheme
     val names = remember { AudioEffects.presetNames() }
     val current = AudioEffects.presetIndex
+    val boost = AudioEffects.boostPercent
     val all = listOf(I18n.t("eq_off", "Nonaktif (suara asli)")) + names
     Column(Modifier.padding(vertical = 8.dp)) {
+        Column(Modifier.padding(horizontal = 20.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    I18n.t("volume_boost", "Volume Boost"),
+                    Modifier.weight(1f),
+                    color = c.onSurface,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    "$boost%",
+                    color = c.primary,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+            Slider(
+                value = boost.toFloat(),
+                onValueChange = { f -> AudioEffects.setBoost(f.toInt()) },
+                valueRange = 0f..100f,
+            )
+        }
+        HorizontalDivider(color = c.onSurface.copy(alpha = 0.08f), modifier = Modifier.padding(vertical = 8.dp))
         all.forEachIndexed { i, name ->
             Row(
                 Modifier

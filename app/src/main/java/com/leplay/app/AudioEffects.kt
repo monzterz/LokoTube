@@ -3,21 +3,26 @@ package com.leplay.app
 import android.content.Context
 import android.content.SharedPreferences
 import android.media.audiofx.Equalizer
+import android.media.audiofx.LoudnessEnhancer
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import kotlin.math.roundToInt
 
 /**
- * Applies an [Equalizer] to the player's audio session using our own
- * band-gain presets (device-independent — some firmware reports zero built-in
- * presets, so we synthesize curves and drive [Equalizer.setBandLevel]).
+ * Applies an [Equalizer] and a [LoudnessEnhancer] (volume boost) to the player's
+ * audio session using our own band-gain presets (device-independent — some
+ * firmware reports zero built-in presets, so we synthesize curves and drive
+ * [Equalizer.setBandLevel]).
  *
- * [presetIndex] 0 = off; 1..N map to [PRESETS].
+ * [presetIndex] 0 = off; 1..N map to [PRESETS]. [boostPercent] 0..100 = volume
+ * boost amount (0 = off).
  */
 object AudioEffects {
     private const val PREFS = "audio_effects"
     private const val KEY_PRESET = "eq_preset"
+    private const val KEY_BOOST = "volume_boost"
+    private const val MAX_BOOST_MB = 6000
 
     /** 5-band gain curves in dB (bass → treble). */
     private val PRESETS = listOf(
@@ -34,7 +39,12 @@ object AudioEffects {
     var presetIndex by mutableStateOf(0)
         private set
 
+    /** 0..100; 0 = off (no boost). */
+    var boostPercent by mutableStateOf(0)
+        private set
+
     private var equalizer: Equalizer? = null
+    private var booster: LoudnessEnhancer? = null
     private var sessionId = 0
 
     private fun prefs(): SharedPreferences =
@@ -42,15 +52,21 @@ object AudioEffects {
 
     fun load() {
         presetIndex = prefs().getInt(KEY_PRESET, 0)
+        boostPercent = prefs().getInt(KEY_BOOST, 0).coerceIn(0, 100)
     }
 
     fun presetNames(): List<String> = PRESETS.map { it.first }
 
     fun attach(audioSessionId: Int) {
         sessionId = audioSessionId
-        if (audioSessionId <= 0 || presetIndex <= 0) return
+        attachEqualizer()
+        attachBooster()
+    }
+
+    private fun attachEqualizer() {
+        if (sessionId <= 0 || presetIndex <= 0) return
         runCatching {
-            val eq = Equalizer(0, audioSessionId)
+            val eq = Equalizer(0, sessionId)
             apply(eq, presetIndex - 1)
             eq.enabled = true
             equalizer?.release()
@@ -62,18 +78,63 @@ object AudioEffects {
         presetIndex = index
         prefs().edit().putInt(KEY_PRESET, index).apply()
         if (index <= 0) {
-            release()
+            releaseEqualizer()
             return
         }
         val eq = equalizer
         if (eq == null) {
-            if (sessionId > 0) attach(sessionId)
+            if (sessionId > 0) attachEqualizer()
             return
         }
         runCatching {
             apply(eq, index - 1)
             eq.enabled = true
         }
+    }
+
+    fun setBoost(pct: Int) {
+        boostPercent = pct.coerceIn(0, 100)
+        prefs().edit().putInt(KEY_BOOST, boostPercent).apply()
+        if (boostPercent <= 0) {
+            releaseBooster()
+            return
+        }
+        val b = booster
+        if (b == null) {
+            if (sessionId > 0) attachBooster()
+            return
+        }
+        runCatching {
+            b.setTargetGain(boostGainMB(boostPercent))
+            b.enabled = true
+        }
+    }
+
+    private fun attachBooster() {
+        if (sessionId <= 0 || boostPercent <= 0) {
+            releaseBooster()
+            return
+        }
+        runCatching {
+            val le = LoudnessEnhancer(sessionId)
+            le.setTargetGain(boostGainMB(boostPercent))
+            le.enabled = true
+            booster?.release()
+            booster = le
+        }
+    }
+
+    private fun boostGainMB(pct: Int): Int =
+        (MAX_BOOST_MB.toLong() * pct.coerceIn(0, 100) / 100L).toInt()
+
+    private fun releaseEqualizer() {
+        runCatching { equalizer?.release() }
+        equalizer = null
+    }
+
+    private fun releaseBooster() {
+        runCatching { booster?.release() }
+        booster = null
     }
 
     /** Maps the 5-band curve onto the device's actual band count. */
@@ -98,7 +159,7 @@ object AudioEffects {
     }
 
     fun release() {
-        runCatching { equalizer?.release() }
-        equalizer = null
+        releaseEqualizer()
+        releaseBooster()
     }
 }
