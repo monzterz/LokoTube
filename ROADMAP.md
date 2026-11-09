@@ -13,7 +13,7 @@ Dikembangkan lanjutan oleh Lokotre.
 - [x] Build release (R8/minify) + publish v0.1.0 dengan APK
 
 ## FASE 3 — Otomasi
-- [ ] GitHub Actions: build otomatis — debug tiap push, release tiap tag + auto-attach
+- [x] GitHub Actions: build otomatis — debug tiap push, release tiap tag + auto-attach
 
 ## Backlog (belum dijadwalkan)
 - [ ] Tema light flat modern (opsi tambahan selain dark Liquid Glass)
