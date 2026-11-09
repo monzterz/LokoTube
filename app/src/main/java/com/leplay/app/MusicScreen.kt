@@ -233,6 +233,16 @@ fun MusicScreen(
 
     PrefetchVisibleTracks(listState, state.recentPlays, "recent_")
     PrefetchVisibleTracks(listState, state.likedTracks, "liked_")
+
+    // Warm the direct tracks on the home shelves so tapping one from the
+    // feed does not pay the cold extraction round-trip.
+    LaunchedEffect(state.shelves) {
+        state.shelves
+            .flatMap { it.items }
+            .filter { it.videoId != null && it.browseId.isNullOrEmpty() && it.playlistId.isNullOrEmpty() }
+            .take(12)
+            .forEach { s -> s.videoId?.let(StreamCache::prefetch) }
+    }
     val context = LocalContext.current
 
     var trackOptionsFor by remember { mutableStateOf<VideoItem?>(null) }
