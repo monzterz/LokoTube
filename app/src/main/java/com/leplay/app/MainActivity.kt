@@ -259,6 +259,15 @@ private val MiniGap = 8.dp
 
 @Composable
 fun LePlayTubeApp() {
+    val context = LocalContext.current
+    var onboardingDone by remember { mutableStateOf(Onboarding.done()) }
+    if (!onboardingDone) {
+        OnboardingScreen(onDone = {
+            Onboarding.markDone(context)
+            onboardingDone = true
+        })
+        return
+    }
     val c = MaterialTheme.colorScheme
     val player = rememberPlayerState()
     val scope = rememberCoroutineScope()
