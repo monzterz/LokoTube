@@ -40,6 +40,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.TextButton
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import android.widget.Toast
@@ -1045,6 +1049,40 @@ fun PlaylistScreen(
     val avatarSeed = remember(channelAvatarSeed) { channelAvatarSeed }
     val c = MaterialTheme.colorScheme
     var filterQuery by remember(playlist.id) { mutableStateOf("") }
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    var selecting by remember(playlist.id) { mutableStateOf(false) }
+    var selectedIds by remember(playlist.id) { mutableStateOf(emptySet<String>()) }
+    var bulkConfirm by remember { mutableStateOf<Pair<Int, Long>?>(null) }
+
+    fun toggleSelect(id: String) {
+        val next = if (id in selectedIds) selectedIds - id else selectedIds + id
+        selectedIds = next
+        if (next.isEmpty()) selecting = false
+    }
+
+    fun beginBulkDownload() {
+        val items = feed.videos.filter { it.id in selectedIds }
+        scope.launch {
+            var total = 0L
+            items.forEach { v ->
+                runCatching { Downloads.options(v.id) }.getOrDefault(emptyList())
+                    .firstOrNull { it.isAudioOnly }?.let { total += it.estimatedBytes }
+            }
+            bulkConfirm = items.size to total
+        }
+    }
+
+    fun confirmBulkDownload() {
+        val items = feed.videos.filter { it.id in selectedIds }
+        scope.launch {
+            items.forEach { runCatching { Downloads.enqueueAudio(it) } }
+            Toast.makeText(context, I18n.t("bulk_queued", "{n} unduhan dimulai").replace("{n}", items.size.toString()), Toast.LENGTH_SHORT).show()
+            selecting = false
+            selectedIds = emptySet()
+            bulkConfirm = null
+        }
+    }
     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
     CollapsingHeaderLayout(
         resetKey = feed.generation,
@@ -1059,45 +1097,88 @@ fun PlaylistScreen(
         }
         },
     ) { top ->
+        val available = if (filterQuery.isBlank()) feed.videos
+        else feed.videos.filter { it.title.contains(filterQuery, true) || it.channel.contains(filterQuery, true) }
+
         Column(Modifier.fillMaxSize()) {
-            // Search-in-playlist filter bar (sits below the collapsing header).
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(top = top, start = 16.dp, end = 16.dp, bottom = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(Icons.Rounded.Search, null, tint = c.onSurfaceVariant, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-                BasicTextField(
-                    value = filterQuery,
-                    onValueChange = { filterQuery = it },
-                    singleLine = true,
-                    textStyle = TextStyle(color = c.onSurface, fontSize = 14.sp),
-                    cursorBrush = SolidColor(c.primary),
-                    modifier = Modifier.weight(1f),
-                    decorationBox = { inner ->
-                        Box {
-                            if (filterQuery.isEmpty()) Text(
-                                I18n.t("search_in_playlist", "Cari di playlist…"),
-                                color = c.onSurfaceVariant.copy(alpha = 0.6f), fontSize = 14.sp,
-                            )
-                            inner()
-                        }
-                    },
-                )
-                if (filterQuery.isNotEmpty()) {
-                    IconButton(onClick = { filterQuery = "" }, modifier = Modifier.size(28.dp)) {
-                        Icon(Icons.Rounded.Close, I18n.t("clear", "Clear"), tint = c.onSurfaceVariant)
+            if (selecting) {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(top = top, start = 8.dp, end = 8.dp, bottom = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        "${selectedIds.size} ${I18n.t("selected", "dipilih")}",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp,
+                        modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+                    )
+                    TextButton(onClick = { if (selectedIds.isNotEmpty()) beginBulkDownload() }, enabled = selectedIds.isNotEmpty()) {
+                        Text(I18n.t("download_n", "Unduh ({n})").replace("{n}", selectedIds.size.toString()))
                     }
+                    TextButton(onClick = { selecting = false; selectedIds = emptySet() }) {
+                        Text(I18n.t("cancel", "Batal"))
+                    }
+                }
+            } else {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(top = top, start = 16.dp, end = 16.dp, bottom = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(Icons.Rounded.Search, null, tint = c.onSurfaceVariant, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    BasicTextField(
+                        value = filterQuery,
+                        onValueChange = { filterQuery = it },
+                        singleLine = true,
+                        textStyle = TextStyle(color = c.onSurface, fontSize = 14.sp),
+                        cursorBrush = SolidColor(c.primary),
+                        modifier = Modifier.weight(1f),
+                        decorationBox = { inner ->
+                            Box {
+                                if (filterQuery.isEmpty()) Text(
+                                    I18n.t("search_in_playlist", "Cari di playlist…"),
+                                    color = c.onSurfaceVariant.copy(alpha = 0.6f), fontSize = 14.sp,
+                                )
+                                inner()
+                            }
+                        },
+                    )
+                    if (filterQuery.isNotEmpty()) {
+                        IconButton(onClick = { filterQuery = "" }, modifier = Modifier.size(28.dp)) {
+                            Icon(Icons.Rounded.Close, I18n.t("clear", "Clear"), tint = c.onSurfaceVariant)
+                        }
+                    }
+                    TextButton(onClick = { selecting = true }) { Text(I18n.t("select", "Pilih")) }
                 }
             }
 
-            val filtered = if (filterQuery.isBlank()) null else feed.videos.filter {
-                it.title.contains(filterQuery, true) || it.channel.contains(filterQuery, true)
-            }
-
-            if (filtered == null) {
+            if (selecting) {
+                if (available.isEmpty()) {
+                    Box(Modifier.fillMaxSize()) { EmptyState(Icons.Rounded.Search, I18n.t("no_results", "No results"), "") }
+                } else {
+                    LazyColumn(contentPadding = contentPadding) {
+                        items(available, key = { "sel_" + it.id }) { v ->
+                            Row(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .combinedClickable(onClick = { toggleSelect(v.id) })
+                                    .padding(horizontal = 6.dp, vertical = 2.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Checkbox(
+                                    checked = v.id in selectedIds,
+                                    onCheckedChange = { toggleSelect(v.id) },
+                                )
+                                VideoRow(video = v, onClick = { toggleSelect(v.id) })
+                            }
+                        }
+                    }
+                }
+            } else if (filterQuery.isBlank()) {
                 if (feed.videos.isEmpty() && !feed.loading && feed.error == null && !feed.hasMore) {
                     val icon = if (playlist.id == "DL") Icons.Rounded.Download else Icons.Rounded.VideoLibrary
                     val title = if (playlist.id == "DL") I18n.t("no_downloads_yet", "No downloads yet") else I18n.t("nothing_here", "Nothing here yet")
@@ -1106,15 +1187,26 @@ fun PlaylistScreen(
                 } else {
                     FeedList(feed, contentPadding, onOpen, indicatorTop = 0.dp, channelAvatarSeed = avatarSeed)
                 }
-            } else if (filtered.isEmpty()) {
+            } else if (available.isEmpty()) {
                 Box(Modifier.fillMaxSize()) { EmptyState(Icons.Rounded.Search, I18n.t("no_results", "No results"), "") }
             } else {
                 LazyColumn(contentPadding = contentPadding) {
-                    items(filtered, key = { "pl_" + playlist.id + "_" + it.id }) { v ->
+                    items(available, key = { "pl_" + playlist.id + "_" + it.id }) { v ->
                         VideoRow(video = v, onClick = { onOpen(v) })
                     }
                 }
             }
+        }
+
+        if (bulkConfirm != null) {
+            val (count, size) = bulkConfirm!!
+            AlertDialog(
+                onDismissRequest = { bulkConfirm = null },
+                title = { Text(I18n.t("confirm_download", "Unduh massal")) },
+                text = { Text(I18n.t("bulk_confirm_body", "{n} video · perkiraan {size}").replace("{n}", count.toString()).replace("{size}", formatBytes(size))) },
+                confirmButton = { TextButton(onClick = { confirmBulkDownload() }) { Text(I18n.t("download", "Unduh")) } },
+                dismissButton = { TextButton(onClick = { bulkConfirm = null }) { Text(I18n.t("cancel", "Batal")) } },
+            )
         }
     }
     }
