@@ -17,5 +17,5 @@ dependencyResolutionManagement {
         maven("https://jitpack.io")
     }
 }
-rootProject.name = "LePlay"
+rootProject.name = "LokoTube"
 include(":app")
