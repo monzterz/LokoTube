@@ -1091,27 +1091,68 @@ fun MiniPlayer(
                             ),
                         ),
                 )
-                Box(
+                Row(
                     modifier = Modifier
                         .align(Alignment.TopStart)
-                        .padding(start = 6.dp, top = 6.dp)
-                        .size(28.dp)
-                        .clip(CircleShape)
-                        .background(Color.Black.copy(alpha = 0.65f))
-                        .pressable(onClick = {
-                            touched()
-                            state.togglePlay()
-                        }),
-                    contentAlignment = Alignment.Center,
+                        .padding(start = 6.dp, top = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    if (state.isBuffering) {
-                        CircularProgressIndicator(
-                            color = Color.White,
-                            strokeWidth = 2.dp,
-                            modifier = Modifier.size(14.dp),
+                    Box(
+                        modifier = Modifier
+                            .size(28.dp)
+                            .clip(CircleShape)
+                            .background(Color.Black.copy(alpha = 0.65f))
+                            .pressable(onClick = {
+                                touched()
+                                state.skipPrevious()
+                            }),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.SkipPrevious,
+                            contentDescription = I18n.t("previous", "Previous"),
+                            tint = Color.White,
+                            modifier = Modifier.size(16.dp),
                         )
-                    } else {
-                        PlayPauseGlyph(state.isPlaying, Color.White, 16.dp)
+                    }
+                    Box(
+                        modifier = Modifier
+                            .size(30.dp)
+                            .clip(CircleShape)
+                            .background(Color.Black.copy(alpha = 0.65f))
+                            .pressable(onClick = {
+                                touched()
+                                state.togglePlay()
+                            }),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (state.isBuffering) {
+                            CircularProgressIndicator(
+                                color = Color.White,
+                                strokeWidth = 2.dp,
+                                modifier = Modifier.size(14.dp),
+                            )
+                        } else {
+                            PlayPauseGlyph(state.isPlaying, Color.White, 16.dp)
+                        }
+                    }
+                    Box(
+                        modifier = Modifier
+                            .size(28.dp)
+                            .clip(CircleShape)
+                            .background(Color.Black.copy(alpha = 0.65f))
+                            .pressable(onClick = {
+                                touched()
+                                state.skipNext()
+                            }),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.SkipNext,
+                            contentDescription = I18n.t("next", "Next"),
+                            tint = Color.White,
+                            modifier = Modifier.size(16.dp),
+                        )
                     }
                 }
 
