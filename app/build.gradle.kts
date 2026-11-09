@@ -47,6 +47,11 @@ android {
     }
 
     buildTypes {
+        debug {
+            // Sign debug with the release keystore (when present) so local test
+            // builds install over the release without wiping user data.
+            signingConfig = signingConfigs.findByName("release")?.takeIf { file("release.keystore").exists() } ?: signingConfigs.getByName("debug")
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true

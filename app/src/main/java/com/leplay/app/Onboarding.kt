@@ -76,7 +76,7 @@ fun OnboardingScreen(onDone: () -> Unit) {
     ) {
         Spacer(Modifier.height(72.dp))
         Image(
-            painter = painterResource(R.mipmap.ic_launcher),
+            painter = painterResource(R.drawable.loko_logo),
             contentDescription = "LokoTube",
             modifier = Modifier
                 .size(112.dp)
