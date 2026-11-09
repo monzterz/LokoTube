@@ -204,14 +204,11 @@ fun VideoContent(
     // delay never happened). The paused check is sampled once, at the
     // moment the controls appear.
     LaunchedEffect(controlsVisible) {
-        if (!controlsVisible) {
-            centerReady = false
-        } else if (!state.isPlaying || TvMode.isTv) {
-            centerReady = true
-        } else {
-            delay(1_000)
-            centerReady = true
-        }
+        // Center cluster (previous/play-pause/next) appears instantly with the
+        // rest of the chrome. The 1s delay was removed: the instant-tap machine
+        // already restores pre-tap visibility on double-tap seek, so the nav
+        // buttons no longer flash and the delay just made the controls feel laggy.
+        centerReady = controlsVisible
     }
     var touchedAt by remember { mutableLongStateOf(0L) }
     fun touched() { touchedAt = System.nanoTime() }
