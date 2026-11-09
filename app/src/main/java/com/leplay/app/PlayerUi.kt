@@ -54,6 +54,7 @@ import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.material.icons.rounded.Fullscreen
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.runtime.SideEffect
@@ -1114,25 +1115,48 @@ fun MiniPlayer(
                     }
                 }
 
-                Box(
+                Row(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .padding(end = 6.dp, top = 6.dp)
-                        .size(28.dp)
-                        .clip(CircleShape)
-                        .background(Color.Black.copy(alpha = 0.65f))
-                        .pressable(onClick = {
-                            touched()
-                            state.close()
-                        }),
-                    contentAlignment = Alignment.Center,
+                        .padding(end = 6.dp, top = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Close,
-                        contentDescription = I18n.t("close_player", "Close player"),
-                        tint = Color.White,
-                        modifier = Modifier.size(16.dp),
-                    )
+                    Box(
+                        modifier = Modifier
+                            .size(28.dp)
+                            .clip(CircleShape)
+                            .background(Color.Black.copy(alpha = 0.65f))
+                            .pressable(onClick = {
+                                touched()
+                                onExpand()
+                            }),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Fullscreen,
+                            contentDescription = I18n.t("expand", "Expand"),
+                            tint = Color.White,
+                            modifier = Modifier.size(15.dp),
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .size(28.dp)
+                            .clip(CircleShape)
+                            .background(Color.Black.copy(alpha = 0.65f))
+                            .pressable(onClick = {
+                                touched()
+                                state.close()
+                            }),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Close,
+                            contentDescription = I18n.t("close_player", "Close player"),
+                            tint = Color.White,
+                            modifier = Modifier.size(16.dp),
+                        )
+                    }
                 }
             }
         }

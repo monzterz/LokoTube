@@ -2495,6 +2495,7 @@ object I18n {
             "equalizer" to "Equalizer",
             "equalizer_sub" to "Atur bass, treble & preset",
             "eq_off" to "Nonaktif (suara asli)",
+            "expand" to "Perluas",
             "theme_system" to "Sistem",
             "theme_dark" to "Gelap",
             "theme_light" to "Terang",
