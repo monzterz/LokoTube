@@ -25,6 +25,10 @@ volume boost, a home-screen mini-player widget, video chapters, in-playlist
 search, bulk downloads, and Indonesian/English translations. Built on
 NewPipeExtractor (no Google Play Services required), GPL-3.0, no ads, no trackers.
 
+Build note: the app has two build flavors — please build the `fdroid` flavor
+(./gradlew assembleFdroidRelease), which ships without the in-app self-updater
+and without the REQUEST_INSTALL_PACKAGES permission.
+
 **Source code:** https://github.com/monzterz/LokoTube
 
 **License:** GPL-3.0-only
