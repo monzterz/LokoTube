@@ -1043,6 +1043,8 @@ fun PlaylistScreen(
 ) {
     LaunchedEffect(playlist.id) { feed.ensureLoaded() }
     val avatarSeed = remember(channelAvatarSeed) { channelAvatarSeed }
+    val c = MaterialTheme.colorScheme
+    var filterQuery by remember(playlist.id) { mutableStateOf("") }
     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
     CollapsingHeaderLayout(
         resetKey = feed.generation,
@@ -1057,13 +1059,62 @@ fun PlaylistScreen(
         }
         },
     ) { top ->
-        if (feed.videos.isEmpty() && !feed.loading && feed.error == null && !feed.hasMore) {
-            val icon = if (playlist.id == "DL") Icons.Rounded.Download else Icons.Rounded.VideoLibrary
-            val title = if (playlist.id == "DL") I18n.t("no_downloads_yet", "No downloads yet") else I18n.t("nothing_here", "Nothing here yet")
-            val body = if (playlist.id == "DL") I18n.t("downloads_empty_body", "Downloaded videos will appear here.") else I18n.t("playlist_empty_body", "Videos you add to this playlist will show up here.")
-            Box(Modifier.padding(top = top)) { EmptyState(icon, title, body) }
-        } else {
-            FeedList(feed, contentPadding.withTop(top), onOpen, indicatorTop = top, channelAvatarSeed = avatarSeed)
+        Column(Modifier.fillMaxSize()) {
+            // Search-in-playlist filter bar (sits below the collapsing header).
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(top = top, start = 16.dp, end = 16.dp, bottom = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(Icons.Rounded.Search, null, tint = c.onSurfaceVariant, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                BasicTextField(
+                    value = filterQuery,
+                    onValueChange = { filterQuery = it },
+                    singleLine = true,
+                    textStyle = TextStyle(color = c.onSurface, fontSize = 14.sp),
+                    cursorBrush = SolidColor(c.primary),
+                    modifier = Modifier.weight(1f),
+                    decorationBox = { inner ->
+                        Box {
+                            if (filterQuery.isEmpty()) Text(
+                                I18n.t("search_in_playlist", "Cari di playlist…"),
+                                color = c.onSurfaceVariant.copy(alpha = 0.6f), fontSize = 14.sp,
+                            )
+                            inner()
+                        }
+                    },
+                )
+                if (filterQuery.isNotEmpty()) {
+                    IconButton(onClick = { filterQuery = "" }, modifier = Modifier.size(28.dp)) {
+                        Icon(Icons.Rounded.Close, I18n.t("clear", "Clear"), tint = c.onSurfaceVariant)
+                    }
+                }
+            }
+
+            val filtered = if (filterQuery.isBlank()) null else feed.videos.filter {
+                it.title.contains(filterQuery, true) || it.channel.contains(filterQuery, true)
+            }
+
+            if (filtered == null) {
+                if (feed.videos.isEmpty() && !feed.loading && feed.error == null && !feed.hasMore) {
+                    val icon = if (playlist.id == "DL") Icons.Rounded.Download else Icons.Rounded.VideoLibrary
+                    val title = if (playlist.id == "DL") I18n.t("no_downloads_yet", "No downloads yet") else I18n.t("nothing_here", "Nothing here yet")
+                    val body = if (playlist.id == "DL") I18n.t("downloads_empty_body", "Downloaded videos will appear here.") else I18n.t("playlist_empty_body", "Videos you add to this playlist will show up here.")
+                    Box(Modifier.fillMaxSize()) { EmptyState(icon, title, body) }
+                } else {
+                    FeedList(feed, contentPadding, onOpen, indicatorTop = 0.dp, channelAvatarSeed = avatarSeed)
+                }
+            } else if (filtered.isEmpty()) {
+                Box(Modifier.fillMaxSize()) { EmptyState(Icons.Rounded.Search, I18n.t("no_results", "No results"), "") }
+            } else {
+                LazyColumn(contentPadding = contentPadding) {
+                    items(filtered, key = { "pl_" + playlist.id + "_" + it.id }) { v ->
+                        VideoRow(video = v, onClick = { onOpen(v) })
+                    }
+                }
+            }
         }
     }
     }

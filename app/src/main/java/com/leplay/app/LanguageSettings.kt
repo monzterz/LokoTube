@@ -2482,6 +2482,8 @@ object I18n {
             "already_in_playlist" to "Sudah ada di playlist ini",
             "local_pl_default_name" to "Playlist {n}",
             "chapters" to "Bab",
+            "search_in_playlist" to "Cari di playlist…",
+            "no_results" to "Tidak ada hasil",
             "theme_system" to "Sistem",
             "theme_dark" to "Gelap",
             "theme_light" to "Terang",
