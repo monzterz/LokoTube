@@ -147,7 +147,7 @@ fun isDarkTheme(): Boolean = when (ThemeSettings.mode) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LePlayTubeTheme(content: @Composable () -> Unit) {
+fun LokoTubeTheme(content: @Composable () -> Unit) {
     val dark = isDarkTheme()
     val isAmoled = ThemeSettings.mode == "amoled"
     val baseScheme = schemeFor(dark)

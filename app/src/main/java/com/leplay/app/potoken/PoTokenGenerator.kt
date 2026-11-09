@@ -2,7 +2,7 @@ package com.leplay.app.potoken
 
 import android.util.Log
 import android.webkit.CookieManager
-import com.leplay.app.LePlayApplication
+import com.leplay.app.LokoTubeApplication
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.TimeoutCancellationException
@@ -33,7 +33,7 @@ class PoTokenGenerator {
             Log.d(TAG, "Pre-initializing PoTokenWebView in background...")
             webPoTokenSessionId = "init-" + System.currentTimeMillis()
             webPoTokenGenerator =
-              PoTokenWebView.getNewPoTokenGenerator(LePlayApplication.appContext)
+              PoTokenWebView.getNewPoTokenGenerator(LokoTubeApplication.appContext)
             webPoTokenStreamingPot = webPoTokenGenerator!!.generatePoToken(webPoTokenSessionId!!)
           }
         }
@@ -112,7 +112,7 @@ class PoTokenGenerator {
           withContext(Dispatchers.Main) { webPoTokenGenerator?.close() }
 
 
-          webPoTokenGenerator = PoTokenWebView.getNewPoTokenGenerator(LePlayApplication.appContext)
+          webPoTokenGenerator = PoTokenWebView.getNewPoTokenGenerator(LokoTubeApplication.appContext)
 
 
 

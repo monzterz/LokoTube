@@ -43,7 +43,7 @@ import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.max
 import kotlin.math.min
 
-private const val TAG = "LePlayDl"
+private const val TAG = "LokoTubeDl"
 
 enum class DownloadStatus { Queued, Downloading, Processing, Paused, Complete, Failed }
 

@@ -598,7 +598,7 @@ class PlayerState(private val scope: CoroutineScope) {
     private fun show(item: VideoItem, startPlayback: Boolean) {
         endHoldSpeed()
         openedAt = android.os.SystemClock.elapsedRealtime()
-        Log.i("LePlayTime", "open ${item.id}")
+        Log.i("LokoTubeTime", "open ${item.id}")
         if (startPlayback) Net.prewarmMediaConnection()
         val outgoing = current
         if (outgoing != null && outgoing.id != item.id && !isMusicMode && !currentShownAsMusic && !historyNavInProgress) {
@@ -678,7 +678,7 @@ class PlayerState(private val scope: CoroutineScope) {
         loadJob = scope.launch {
             runCatching { YouTube.details(item.id) }
                 .onSuccess { d ->
-                    Log.i("LePlayTime", "details +${android.os.SystemClock.elapsedRealtime() - openedAt}ms")
+                    Log.i("LokoTubeTime", "details +${android.os.SystemClock.elapsedRealtime() - openedAt}ms")
                     details = d
                     val collapsedRelated = diversifyRelated(d.related, item)
                     displayRelated = interleaveFeed(collapsedRelated, item)
@@ -1664,7 +1664,7 @@ class PlayerState(private val scope: CoroutineScope) {
         }
 
         override fun onRenderedFirstFrame() {
-            Log.i("LePlayTime", "first frame +${android.os.SystemClock.elapsedRealtime() - openedAt}ms")
+            Log.i("LokoTubeTime", "first frame +${android.os.SystemClock.elapsedRealtime() - openedAt}ms")
             firstFrameRendered = true
         }
 
@@ -1699,7 +1699,7 @@ class PlayerState(private val scope: CoroutineScope) {
     private fun describeFormat(width: Int, height: Int) {
         val tier = qualityTier(width, height)
         if (decodedHeight != tier) {
-            Log.i("LePlayTime", "now ${tier}p (${width}×${height}) at +${android.os.SystemClock.elapsedRealtime() - openedAt}ms")
+            Log.i("LokoTubeTime", "now ${tier}p (${width}×${height}) at +${android.os.SystemClock.elapsedRealtime() - openedAt}ms")
         }
         decodedHeight = tier
         val formats = controller?.currentTracks?.groups.orEmpty()

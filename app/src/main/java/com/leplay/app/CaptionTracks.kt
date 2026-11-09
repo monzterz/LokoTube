@@ -23,7 +23,7 @@ data class CaptionTrack(
 )
 
 object CaptionTracks {
-    private const val TAG = "LePlayCaptions"
+    private const val TAG = "LokoTubeCaptions"
     private const val MAX_AGE_MS = 3 * 60 * 60 * 1000L
 
     private class Entry(val tracks: List<CaptionTrack>, val at: Long)

@@ -29,7 +29,7 @@ object PlaybackBandwidth {
         get(context.applicationContext)
     }
 
-    fun get(): BandwidthMeter = get(LePlayApplication.appContext)
+    fun get(): BandwidthMeter = get(LokoTubeApplication.appContext)
 
     private fun get(context: Context): DefaultBandwidthMeter {
         meter?.let { return it }

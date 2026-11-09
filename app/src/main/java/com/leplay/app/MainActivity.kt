@@ -142,7 +142,7 @@ class MainActivity : ComponentActivity() {
         ) {
             notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
-        setContent { LePlayTubeTheme { LePlayTubeApp() } }
+        setContent { LokoTubeTheme { LokoTubeApp() } }
     }
 
     override fun onResume() {
@@ -258,7 +258,7 @@ private val MiniWidth = 368.dp
 private val MiniGap = 8.dp
 
 @Composable
-fun LePlayTubeApp() {
+fun LokoTubeApp() {
     val context = LocalContext.current
     var onboardingDone by remember { mutableStateOf(Onboarding.done()) }
     if (!onboardingDone) {

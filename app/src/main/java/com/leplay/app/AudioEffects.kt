@@ -50,7 +50,7 @@ object AudioEffects {
     private var sessionId = 0
 
     private fun prefs(): SharedPreferences =
-        LePlayApplication.appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        LokoTubeApplication.appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
     fun load() {
         presetIndex = prefs().getInt(KEY_PRESET, 0)

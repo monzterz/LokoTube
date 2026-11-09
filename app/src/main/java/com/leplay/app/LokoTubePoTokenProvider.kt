@@ -5,9 +5,9 @@ import com.leplay.app.potoken.PoTokenGenerator
 import org.schabi.newpipe.extractor.services.youtube.PoTokenProvider
 import org.schabi.newpipe.extractor.services.youtube.PoTokenResult
 
-class LePlayPoTokenProvider(private val generator: PoTokenGenerator) : PoTokenProvider {
+class LokoTubePoTokenProvider(private val generator: PoTokenGenerator) : PoTokenProvider {
     companion object {
-        private const val TAG = "LePlayPoTokenProvider"
+        private const val TAG = "LokoTubePoTokenProvider"
     }
 
     private fun resolvePoToken(videoId: String?): PoTokenResult? {

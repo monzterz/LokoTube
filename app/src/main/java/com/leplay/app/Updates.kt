@@ -142,10 +142,10 @@ suspend fun fetchReleaseHistory(): List<ReleaseEntry> = withContext(Dispatchers.
     } catch (e: kotlinx.coroutines.CancellationException) {
         throw e
     } catch (e: ReleaseHistoryException) {
-        Log.e("LePlayUpdates", "fetchReleaseHistory failed: ${e.detail}", e)
+        Log.e("LokoTubeUpdates", "fetchReleaseHistory failed: ${e.detail}", e)
         throw e
     } catch (e: Exception) {
-        Log.e("LePlayUpdates", "fetchReleaseHistory failed", e)
+        Log.e("LokoTubeUpdates", "fetchReleaseHistory failed", e)
         val detail = "${e.javaClass.simpleName}: ${e.message ?: "no message"}".take(120)
         throw ReleaseHistoryException(detail, e)
     }

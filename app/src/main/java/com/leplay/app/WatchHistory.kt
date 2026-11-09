@@ -27,7 +27,7 @@ object WatchHistory {
     private const val MAX = 200
 
     private val prefs by lazy {
-        LePlayApplication.appContext.getSharedPreferences(PREFS, android.content.Context.MODE_PRIVATE)
+        LokoTubeApplication.appContext.getSharedPreferences(PREFS, android.content.Context.MODE_PRIVATE)
     }
 
     var items by mutableStateOf<List<VideoItem>>(emptyList())

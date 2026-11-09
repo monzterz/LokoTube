@@ -9,7 +9,7 @@ import com.leplay.app.potoken.PoTokenGenerator
 import org.schabi.newpipe.extractor.NewPipe
 import org.schabi.newpipe.extractor.services.youtube.extractors.YoutubeStreamExtractor
 
-class LePlayApplication : Application(), ImageLoaderFactory {
+class LokoTubeApplication : Application(), ImageLoaderFactory {
 
     companion object {
         lateinit var appContext: Context
@@ -30,7 +30,7 @@ class LePlayApplication : Application(), ImageLoaderFactory {
 
         val poTokenGenerator = PoTokenGenerator()
         poTokenGenerator.initialize()
-        YoutubeStreamExtractor.setPoTokenProvider(LePlayPoTokenProvider(poTokenGenerator))
+        YoutubeStreamExtractor.setPoTokenProvider(LokoTubePoTokenProvider(poTokenGenerator))
 
 
         YoutubeStreamExtractor.setFetchIosClient(true)
