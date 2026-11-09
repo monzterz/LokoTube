@@ -2116,6 +2116,14 @@ private fun androidx.compose.foundation.layout.BoxScope.BitChordMiniDetails(
     )
 }
 
+private fun chapterTime(ms: Long): String {
+    val totalSec = ms / 1000
+    val h = totalSec / 3600
+    val m = (totalSec % 3600) / 60
+    val s = totalSec % 60
+    return if (h > 0) "%d:%02d:%02d".format(h, m, s) else "%d:%02d".format(m, s)
+}
+
 @Composable
 private fun VideoDetailsBlock(
     state: PlayerState,
@@ -2194,6 +2202,41 @@ private fun VideoDetailsBlock(
                         lineHeight = 20.sp,
                         fontWeight = FontWeight.Medium,
                     )
+                }
+                if (details.chapters.size >= 2) {
+                    Spacer(Modifier.height(16.dp))
+                    Text(
+                        I18n.t("chapters", "Chapters"),
+                        color = c.onSurface,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    details.chapters.forEach { ch ->
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .pressable(pressedScale = 0.97f) { state.seekTo(ch.startMs) }
+                                .padding(vertical = 7.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                chapterTime(ch.startMs),
+                                color = c.primary,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.width(56.dp),
+                            )
+                            Text(
+                                ch.title,
+                                color = c.onSurfaceVariant,
+                                fontSize = 13.5.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                fontWeight = FontWeight.Medium,
+                            )
+                        }
+                    }
                 }
             }
         }

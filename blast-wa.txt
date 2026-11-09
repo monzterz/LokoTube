@@ -1,0 +1,18 @@
+*🚀 LokoTube v0.1.1 — YouTube & YouTube Music tanpa iklan!*
+
+Aplikasi Android ringan, GRATIS, dan open-source buat nonton YouTube tanpa iklan.
+
+*Fitur:*
+✅ Bebas iklan, kualitas hingga 4K HDR
+🎵 Mode YouTube Music + lirik tersinkron
+⬇️ Download video/audio sampai 4K
+🎨 Tema Liquid Glass & Flat Light
+📱 Mode latar (PiP), layar penuh, & Android TV
+🇮🇩 Antarmuka bahasa Indonesia
+
+*Download:*
+https://github.com/monzterz/LokoTube/releases/download/v0.1.1/LokoTube-0.1.1.apk
+
+✦ Android 7.0 ke atas — kalau muncul "sumber tidak dikenal", izinkan di pengaturan.
+
+Kredit: Levi Setiadi (LePlay) • mod by Lokotre • GPL-3.0

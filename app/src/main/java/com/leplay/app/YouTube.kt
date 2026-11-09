@@ -91,9 +91,49 @@ data class CommunityPage(
 )
 
 @Immutable
+data class VideoChapter(
+    val title: String,
+    val startMs: Long,
+)
+
+private val CHAPTER_LINE = Regex("""^[\[(]?\s*((?:\d{1,2}:)?\d{1,2}:\d{2})\s*[\])]?\s+(.{1,120})$""")
+private val BARE_TIME = Regex("""^\d{1,2}:\d{2}""")
+
+private fun parseTimestampMs(ts: String): Long {
+    val parts = ts.split(":").mapNotNull { it.toIntOrNull() }
+    if (parts.size !in 2..3) return -1L
+    return if (parts.size == 3) ((parts[0] * 60L + parts[1]) * 60L + parts[2]) * 1000L
+    else (parts[0] * 60L + parts[1]) * 1000L
+}
+
+/** Extracts timestamped chapters from a video description (the standard
+ *  YouTube "0:00 Intro" lines). Returns them sorted and de-duplicated. */
+fun parseChapters(description: String): List<VideoChapter> {
+    if (description.isBlank()) return emptyList()
+    val found = ArrayList<VideoChapter>()
+    for (line in description.lineSequence()) {
+        val m = CHAPTER_LINE.find(line) ?: continue
+        val ms = parseTimestampMs(m.groupValues[1])
+        if (ms < 0L) continue
+        val title = m.groupValues[2].trim()
+        if (title.isEmpty() || BARE_TIME.matches(title)) continue
+        found.add(VideoChapter(title, ms))
+    }
+    val kept = ArrayList<VideoChapter>()
+    var last = -1L
+    for (c in found.sortedBy { it.startMs }) {
+        if (c.startMs <= last) continue
+        kept.add(c)
+        last = c.startMs
+    }
+    return kept
+}
+
+@Immutable
 data class VideoDetails(
     val item: VideoItem,
     val description: String,
+    val chapters: List<VideoChapter> = emptyList(),
     val likes: Long,
     val dislikes: Long = -1L,
     val subscribers: Long,
@@ -268,6 +308,10 @@ object YouTube {
                 }
             }
         }
+        val processedDescription = info.description?.let { d ->
+            if (d.type == Description.HTML) HtmlCompat.fromHtml(d.content, HtmlCompat.FROM_HTML_MODE_COMPACT).toString().trim()
+            else d.content.trim()
+        }.orEmpty()
         VideoDetails(
             item = VideoItem(
                 id = id,
@@ -281,10 +325,8 @@ object YouTube {
                 uploaded = if (isLive) "Live" else uploadedText(info.textualUploadDate, info.uploadDate),
                 isLive = isLive,
             ),
-            description = info.description?.let { d ->
-                if (d.type == Description.HTML) HtmlCompat.fromHtml(d.content, HtmlCompat.FROM_HTML_MODE_COMPACT).toString().trim()
-                else d.content.trim()
-            }.orEmpty(),
+            description = processedDescription,
+            chapters = parseChapters(processedDescription),
             likes = info.likeCount,
             subscribers = info.uploaderSubscriberCount,
             related = info.relatedItems.filterIsInstance<StreamInfoItem>().mapNotNull { it.toVideoItem() }.let { list ->
