@@ -62,7 +62,8 @@ object GlassQuality {
     /** Recompute the gate from all three inputs: device capability, the Liquid
      *  Glass preference and the Lite Mode (Mode Ringan) interlock. */
     internal fun recompute() {
-        effectsSupported = deviceSupports && GlassSettings.enabled && !GlassSettings.liteMode
+        effectsSupported = deviceSupports && GlassSettings.enabled && !GlassSettings.liteMode &&
+            ThemeSettings.mode != "flatlight"
     }
 }
 

@@ -47,6 +47,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -990,6 +992,7 @@ private fun DonationCard(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun AppearanceThemeContent(context: Context) {
     val c = MaterialTheme.colorScheme
@@ -1032,14 +1035,16 @@ private fun AppearanceThemeContent(context: Context) {
                 }
             }
             Spacer(Modifier.height(10.dp))
-            Row(
+            FlowRow(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
             listOf(
                 "system" to I18n.t("theme_system", "System"),
                 "dark" to I18n.t("theme_dark", "Dark"),
                 "light" to I18n.t("theme_light", "Light"),
+                "flatlight" to I18n.t("theme_flat_light", "Flat Light"),
                 "amoled" to I18n.t("theme_amoled", "AMOLED"),
             ).forEach { (mode, label) ->
                 val on = ThemeSettings.mode == mode
@@ -1055,7 +1060,6 @@ private fun AppearanceThemeContent(context: Context) {
                 val themeGlass = LocalSettingsBackdrop.current
                 Box(
                     modifier = Modifier
-                        .weight(1f)
                         .pressable { ThemeSettings.chooseMode(mode) }
                         .then(
                             when {
@@ -1064,7 +1068,7 @@ private fun AppearanceThemeContent(context: Context) {
                                 else -> Modifier.pageGlass(RoundedCornerShape(14.dp), c.surfaceContainerHigh)
                             },
                         )
-                        .padding(vertical = 10.dp),
+                        .padding(vertical = 10.dp, horizontal = 14.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(

@@ -94,6 +94,7 @@ object ThemeSettings {
     fun chooseMode(value: String) {
         mode = value
         prefs?.edit()?.putString("mode", value)?.apply()
+        GlassQuality.recompute()
     }
 
     fun updateUseSystemFont(enabled: Boolean) {
@@ -140,7 +141,7 @@ fun schemeFor(dark: Boolean): ColorScheme = youTubeScheme(dark)
 @Composable
 fun isDarkTheme(): Boolean = when (ThemeSettings.mode) {
     "dark", "amoled" -> true
-    "light" -> false
+    "light", "flatlight" -> false
     else -> isSystemInDarkTheme()
 }
 
