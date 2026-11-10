@@ -86,6 +86,7 @@ import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TextButton
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.runtime.Composable
@@ -312,6 +313,34 @@ fun LokoTubeApp() {
 
     val scrollToTop = remember { mutableStateMapOf<Tab, Int>() }
     val reduced = rememberReducedMotion() || GlassSettings.liteMode
+
+    // "Black box" crash prompt: if the app force-closed last session, offer
+    // to share the saved stack trace (see CrashLog). No telemetry.
+    var showCrashPrompt by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        if (CrashLog.hasPending(context)) showCrashPrompt = true
+    }
+    if (showCrashPrompt) {
+        val closePrompt = {
+            showCrashPrompt = false
+            CrashLog.acknowledge(context)
+        }
+        AlertDialog(
+            onDismissRequest = closePrompt,
+            title = { Text("LokoTube berhenti sebelumnya") },
+            text = { Text("Aplikasi keluar tiba-tiba di sesi sebelumnya. Kirim log agar mudah diperbaiki?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showCrashPrompt = false
+                    CrashLog.acknowledge(context)
+                    CrashLog.shareLatest(context)
+                }) { Text("Kirim log") }
+            },
+            dismissButton = {
+                TextButton(onClick = closePrompt) { Text("Tutup") }
+            },
+        )
+    }
     val morph = remember { PlayerMorph(scope) { expanded -> player.expanded = expanded } }
     var miniOffsetX by remember { mutableFloatStateOf(0f) }
     var miniOffsetY by remember { mutableFloatStateOf(0f) }

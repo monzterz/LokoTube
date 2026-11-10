@@ -19,6 +19,7 @@ class LokoTubeApplication : Application(), ImageLoaderFactory {
     override fun onCreate() {
         super.onCreate()
         appContext = applicationContext
+        CrashLog.install(this)
         TvMode.init(this)
         LanguageSettings.init(this)
         GlassQuality.init(this)

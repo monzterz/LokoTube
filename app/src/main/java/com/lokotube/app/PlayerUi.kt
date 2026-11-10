@@ -1602,48 +1602,7 @@ fun BitChordMusicPlayer(
             Spacer(Modifier.height(16.dp))
 
 
-            val duration = state.durationMs.coerceAtLeast(1L)
-            val currentPos = state.positionMs.coerceIn(0L, duration)
-            var dragPos by remember { mutableStateOf<Float?>(null) }
-            val sliderValue = dragPos ?: (currentPos.toFloat() / duration.toFloat())
-
-            Slider(
-                value = sliderValue.coerceIn(0f, 1f),
-                onValueChange = { dragPos = it },
-                onValueChangeFinished = {
-                    dragPos?.let {
-                        state.seekTo((it * duration).toLong())
-                    }
-                    dragPos = null
-                },
-                colors = SliderDefaults.colors(
-                    thumbColor = c.onSurface,
-                    activeTrackColor = c.onSurface,
-                    inactiveTrackColor = c.onSurface.copy(alpha = 0.2f),
-                ),
-                modifier = Modifier.fillMaxWidth(),
-            )
-
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 4.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Text(
-                    formatDuration((dragPos?.let { (it * duration).toLong() } ?: currentPos)),
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = c.onSurfaceVariant.copy(alpha = 0.75f),
-                )
-                Text(
-                    formatDuration(duration),
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = c.onSurfaceVariant.copy(alpha = 0.75f),
-                )
-            }
+            MusicSeekBar(state)
 
             Spacer(Modifier.height(12.dp))
 
@@ -1820,6 +1779,51 @@ fun BitChordMusicPlayer(
 
 
 
+
+@Composable
+private fun MusicSeekBar(state: PlayerState, modifier: Modifier = Modifier) {
+    val c = MaterialTheme.colorScheme
+    val duration = state.durationMs.coerceAtLeast(1L)
+    val currentPos = state.positionMs.coerceIn(0L, duration)
+    var dragPos by remember { mutableStateOf<Float?>(null) }
+    val sliderValue = dragPos ?: (currentPos.toFloat() / duration.toFloat())
+
+    Column(modifier.fillMaxWidth()) {
+        Slider(
+            value = sliderValue.coerceIn(0f, 1f),
+            onValueChange = { dragPos = it },
+            onValueChangeFinished = {
+                dragPos?.let { state.seekTo((it * duration).toLong()) }
+                dragPos = null
+            },
+            colors = SliderDefaults.colors(
+                thumbColor = c.onSurface,
+                activeTrackColor = c.onSurface,
+                inactiveTrackColor = c.onSurface.copy(alpha = 0.2f),
+            ),
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                formatDuration(dragPos?.let { (it * duration).toLong() } ?: currentPos),
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = c.onSurfaceVariant.copy(alpha = 0.75f),
+            )
+            Text(
+                formatDuration(duration),
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = c.onSurfaceVariant.copy(alpha = 0.75f),
+            )
+        }
+    }
+}
 
 @Composable
 private fun MusicLyricsPanel(

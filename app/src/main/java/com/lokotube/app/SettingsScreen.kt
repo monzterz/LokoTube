@@ -92,6 +92,9 @@ import androidx.compose.material.icons.rounded.SystemUpdate
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.Translate
 import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.Autorenew
+import androidx.compose.material.icons.rounded.BatteryChargingFull
+import androidx.compose.material.icons.rounded.BugReport
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.BasicTextField
@@ -278,6 +281,36 @@ fun SettingsScreen(
                         title = I18n.t("storage_usage", "Storage Usage"),
                         subtitle = I18n.t("storage_sub", "See phone storage & clear LokoTube cache"),
                         onClick = { activeFloatingSection = SettingsFloatingSection.STORAGE_USAGE },
+                        padded = false,
+                    )
+                }
+
+                SettingsSectionHeader(I18n.t("power_section", "Power & Background"))
+                SettingsCard {
+                    val batteryExempt = remember { PowerSettings.isIgnoringBatteryOptimizations(context) }
+                    SettingsRow(
+                        icon = Icons.Rounded.BatteryChargingFull,
+                        title = I18n.t("battery_opt", "Battery optimization"),
+                        subtitle = if (batteryExempt) I18n.t("battery_opt_on", "LokoTube is exempted — background playback allowed") else I18n.t("battery_opt_off", "Tap to allow background playback"),
+                        onClick = { PowerSettings.openBatteryOptimizationSettings(context) },
+                        padded = false,
+                    )
+                    SettingsRow(
+                        icon = Icons.Rounded.Autorenew,
+                        title = I18n.t("autostart", "Auto-start"),
+                        subtitle = I18n.t("autostart_sub", "Keep playing when the screen is off (Xiaomi/HyperOS)"),
+                        onClick = { PowerSettings.openAutoStartSettings(context) },
+                        padded = false,
+                    )
+                    SettingsRow(
+                        icon = Icons.Rounded.BugReport,
+                        title = I18n.t("crash_log", "Crash log"),
+                        subtitle = I18n.t("crash_log_sub", "Send the last crash log for debugging"),
+                        onClick = {
+                            if (!CrashLog.shareLatest(context)) {
+                                android.widget.Toast.makeText(context, I18n.t("crash_none", "No crash log recorded"), android.widget.Toast.LENGTH_SHORT).show()
+                            }
+                        },
                         padded = false,
                     )
                 }
