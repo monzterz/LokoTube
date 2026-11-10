@@ -40,7 +40,7 @@ Dikembangkan lanjutan oleh Lokotre (Rizal). v0.1.5 (versionCode 6).
 
 - Branding teal + ikon LOKO + About "Levi Setiadi mod by Lokotre" + pembersihan nama/namespace (com.lokotube.app, nol jejak LePlay).
 - Donasi Rizal (DANA/Superbank), keystore release, rilis v0.1.0–v0.1.5 + CI otomatis.
-- Auto-sync upstream LePlay (workflow harian + manual).
+- Auto-sync upstream LePlay — pernah dipasang, kini DINONAKTIFKAN (mandiri penuh, atribusi Levi tetap).
 - Tema Flat Light + Liquid Glass, terjemahan Indonesia, import/ekspor langganan+playlist.
 - Fix player LePlay (tap/fullscreen/instant/0.0.9), prefetch + pre-buffer audio.
 - Chapter, unduh massal, saklar radio/autoplay, cari di playlist.
