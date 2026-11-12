@@ -62,6 +62,9 @@ import org.schabi.newpipe.extractor.Page
 
 val LocalChannelOpener = staticCompositionLocalOf<(String) -> Unit> { {} }
 
+/** Opens a music artist's discography page from its channel/browse id + display name. */
+val LocalArtistOpener = staticCompositionLocalOf<(String, String) -> Unit> { { _: String, _: String -> } }
+
 enum class ChannelTab(val raw: String) {
     Videos("Videos"),
     Shorts("Shorts"),

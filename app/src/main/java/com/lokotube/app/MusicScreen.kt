@@ -102,9 +102,11 @@ import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 fun isMusicTrack(video: VideoItem): Boolean {
     val t = video.title.lowercase()
@@ -204,6 +206,9 @@ fun MusicScreen(
     onOpenLooseQueue: (List<VideoItem>, Int) -> Unit = onOpenQueue,
     onOpenBoundQueue: (List<VideoItem>, Int) -> Unit = onOpenQueue,
     scrollToTop: Int = 0,
+    artistBrowseId: String? = null,
+    artistName: String = "",
+    onCloseArtist: () -> Unit = {},
 ) {
     val scope = rememberCoroutineScope()
     val state = remember { MusicFeedState(scope) }
@@ -273,6 +278,47 @@ fun MusicScreen(
     }
 
     BackHandler(enabled = mix != null) { mix = null }
+
+    var artistShelves by remember { mutableStateOf<List<MusicShelf>>(emptyList()) }
+    var artistLoading by remember { mutableStateOf(false) }
+    var artistError by remember { mutableStateOf<String?>(null) }
+    var artistRetry by remember { mutableIntStateOf(0) }
+    LaunchedEffect(artistBrowseId, artistRetry) {
+        if (artistBrowseId == null) {
+            artistShelves = emptyList()
+            artistLoading = false
+            artistError = null
+            return@LaunchedEffect
+        }
+        artistShelves = emptyList()
+        artistError = null
+        artistLoading = true
+        runCatching { InnerTube.musicArtistShelves(artistBrowseId) }
+            .onSuccess { artistShelves = it }
+            .onFailure { artistError = YouTube.friendlyError(it) }
+        artistLoading = false
+    }
+    BackHandler(enabled = artistBrowseId != null) { onCloseArtist() }
+
+    val artistSongs = remember(artistShelves) {
+        artistShelves
+            .flatMap { it.items }
+            .filter { !it.videoId.isNullOrEmpty() }
+            .mapNotNull { it.toVideoItem() }
+            .distinctBy { it.id }
+    }
+    var artistDurations by remember { mutableStateOf<Map<String, Long>>(emptyMap()) }
+    LaunchedEffect(artistSongs) {
+        artistDurations = emptyMap()
+        if (artistBrowseId == null || artistSongs.isEmpty()) return@LaunchedEffect
+        val acc = HashMap<String, Long>()
+        for (song in artistSongs.take(25)) {
+            val d = withContext(Dispatchers.IO) {
+                runCatching { StreamCache.getOrLoad(song.id).duration }.getOrNull()
+            }
+            if (d != null) { acc[song.id] = d; artistDurations = HashMap(acc) }
+        }
+    }
 
     BackHandler(enabled = isSearching) {
         if (searchQuery.isNotEmpty()) {
@@ -544,6 +590,32 @@ fun MusicScreen(
         }
 
         AnimatedContent(
+            targetState = artistBrowseId,
+            transitionSpec = {
+                if (GlassSettings.liteMode) fadeIn(snap()) togetherWith fadeOut(snap())
+                else (fadeIn(tween(220, easing = Motion.Emphasized)) + slideInVertically(tween(280, easing = Motion.Emphasized)) { it / 12 }) togetherWith
+                    fadeOut(tween(90, easing = Motion.Emphasized))
+            },
+            label = "musicArtist",
+            modifier = Modifier.fillMaxSize(),
+        ) { bid ->
+            if (bid != null) {
+                MusicArtistView(
+                    name = artistName,
+                    songs = artistSongs,
+                    durations = artistDurations,
+                    loading = artistLoading,
+                    error = artistError,
+                    contentPadding = contentPadding,
+                    onBack = onCloseArtist,
+                    onRetry = { artistRetry++ },
+                    onOpenTrack = { list, idx -> onOpenLooseQueue(list, idx) },
+                    onOptions = { track -> trackOptionsFor = track },
+                )
+            }
+        }
+
+        AnimatedContent(
             targetState = mix,
             transitionSpec = {
                 if (GlassSettings.liteMode) {
@@ -613,6 +685,114 @@ private fun MusicScreenHeader(
                 Icon(Icons.Rounded.Search, contentDescription = I18n.t("music_search_cd", "Music Search"), tint = c.onSurface)
             }
             AccountAction(onClick = onAccount)
+        }
+    }
+}
+
+@Composable
+private fun MusicArtistView(
+    name: String,
+    songs: List<VideoItem>,
+    durations: Map<String, Long>,
+    loading: Boolean,
+    error: String?,
+    contentPadding: PaddingValues,
+    onBack: () -> Unit,
+    onRetry: () -> Unit,
+    onOpenTrack: (List<VideoItem>, Int) -> Unit,
+    onOptions: (VideoItem) -> Unit,
+) {
+    val c = MaterialTheme.colorScheme
+    Column(Modifier.fillMaxSize().background(c.surface)) {
+        BackScreenHeader(onBack = onBack) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    "ARTIST",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.2.sp,
+                    color = c.onSurfaceVariant.copy(alpha = 0.85f),
+                )
+                Text(
+                    name,
+                    fontFamily = RoundedHeavy,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 20.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    color = c.onSurface,
+                )
+            }
+        }
+        when {
+            loading && songs.isEmpty() -> Box(Modifier.fillMaxSize(), Alignment.Center) {
+                CircularProgressIndicator(color = c.primary, strokeWidth = 2.5.dp)
+            }
+            error != null && songs.isEmpty() -> EmptyState(
+                icon = Icons.Rounded.MusicNote,
+                title = I18n.t("music_artist_load_error", "Couldn't load this artist"),
+                body = error ?: "",
+                action = { PillButton(I18n.t("retry", "Retry"), onClick = onRetry) },
+            )
+            else -> LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = contentPadding,
+            ) {
+                itemsIndexed(songs, key = { _, s -> "artist_song_" + s.id }) { index, song ->
+                    Box(if (GlassSettings.liteMode) Modifier else Modifier.animateItem()) {
+                        ArtistSongRow(
+                            song = song,
+                            duration = durations[song.id],
+                            onClick = { onOpenTrack(songs, index) },
+                            onOptions = { onOptions(song) },
+                        )
+                    }
+                }
+                item(key = "artist_bottom_space") { Spacer(Modifier.height(24.dp)) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ArtistSongRow(
+    song: VideoItem,
+    duration: Long?,
+    onClick: () -> Unit,
+    onOptions: () -> Unit,
+) {
+    val c = MaterialTheme.colorScheme
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .pressable(pressedScale = 0.97f, onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(
+                song.title,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                color = c.onSurface,
+            )
+        }
+        Spacer(Modifier.width(12.dp))
+        Text(
+            duration?.let { formatDuration(it * 1000) } ?: "–",
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Medium,
+            color = c.onSurfaceVariant,
+        )
+        IconButton(onClick = onOptions, modifier = Modifier.size(36.dp)) {
+            Icon(
+                Icons.Rounded.MoreVert,
+                contentDescription = I18n.t("options", "Options"),
+                tint = c.onSurfaceVariant.copy(alpha = 0.7f),
+                modifier = Modifier.size(20.dp),
+            )
         }
     }
 }

@@ -280,6 +280,7 @@ fun LokoTubeApp() {
     var openSettings by remember { mutableStateOf(false) }
     var openPlaylist by remember { mutableStateOf<PlaylistRef?>(null) }
     var openChannel by remember { mutableStateOf<String?>(null) }
+    var musicArtist by remember { mutableStateOf<Pair<String, String>?>(null) }
     var shortsEntry by remember { mutableStateOf<VideoItem?>(null) }
     var openAllSubscriptions by remember { mutableStateOf(false) }
     var openLocalPlaylists by remember { mutableStateOf(false) }
@@ -623,6 +624,11 @@ fun LokoTubeApp() {
                 if (channelState?.url != url) channelState = ChannelState(url, scope)
                 openChannel = url
             },
+            LocalArtistOpener provides { browseId, name ->
+                player.expanded = false
+                tab = Tab.Music
+                musicArtist = browseId to name
+            },
         ) {
         Box(
             Modifier
@@ -668,6 +674,9 @@ fun LokoTubeApp() {
                         player.openMusicQueue(items, index, source = MusicQueueSource.BoundList)
                     },
                     scrollToTop = scrollToTop[Tab.Music] ?: 0,
+                    artistBrowseId = musicArtist?.first,
+                    artistName = musicArtist?.second ?: "",
+                    onCloseArtist = { musicArtist = null },
                 )
                 Tab.Shorts -> ShortsScreen(
                     onBack = { tab = Tab.Home },

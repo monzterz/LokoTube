@@ -1576,13 +1576,19 @@ fun BitChordMusicPlayer(
                         overflow = TextOverflow.Ellipsis,
                     )
                     Spacer(Modifier.height(3.dp))
+                    val openArtist = LocalArtistOpener.current
+                    val artistId = item.channelId()
                     Text(
                         item.channel,
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Medium,
-                        color = c.onSurfaceVariant.copy(alpha = 0.85f),
+                        color = if (artistId != null) c.primary else c.onSurfaceVariant.copy(alpha = 0.85f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.pressable(
+                            enabled = artistId != null,
+                            pressedScale = 0.97f,
+                        ) { artistId?.let { openArtist(it, item.channel) } },
                     )
                 }
                 Spacer(Modifier.width(12.dp))

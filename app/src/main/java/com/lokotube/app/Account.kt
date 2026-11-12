@@ -48,13 +48,14 @@ data class MusicShelfItem(
     val videoId: String?,
     val browseId: String?,
     val playlistId: String? = null,
+    val artistBrowseId: String? = null,
 ) {
     fun toVideoItem(): VideoItem? = videoId?.let { vid ->
         VideoItem(
             id = vid,
             title = title,
             channel = subtitle,
-            channelUrl = null,
+            channelUrl = artistBrowseId.asChannelUrl(),
             thumbnail = highResMusicThumbnail(thumbnail),
             avatar = null,
             durationSec = 0L,
@@ -1416,6 +1417,7 @@ object InnerTube {
                     val col1 = flexCols?.optJSONObject(1)?.optJSONObject("musicResponsiveListItemFlexColumnRenderer")
                     val title = col0?.text("text") ?: "Track"
                     val artist = col1?.text("text") ?: "Unknown"
+                    val artistBrowseId = col1?.firstBrowseId("text")
                     val thumb = highResMusicThumbnail(
                         obj.optJSONObject("thumbnail")
                             ?.optJSONObject("musicThumbnailRenderer")
@@ -1426,7 +1428,7 @@ object InnerTube {
                             id = vid,
                             title = title,
                             channel = artist,
-                            channelUrl = null,
+                            channelUrl = artistBrowseId.asChannelUrl(),
                             thumbnail = thumb,
                             avatar = null,
                             durationSec = 0L,
@@ -1444,6 +1446,7 @@ object InnerTube {
                 if (!vid.isNullOrEmpty()) {
                     val title = obj.text("title") ?: "Track"
                     val subtitle = obj.text("subtitle") ?: ""
+                    val artistBrowseId = obj.firstBrowseId("subtitle")
                     val thumb = highResMusicThumbnail(
                         obj.optJSONObject("thumbnailRenderer")
                             ?.optJSONObject("musicThumbnailRenderer")
@@ -1454,7 +1457,7 @@ object InnerTube {
                             id = vid,
                             title = title,
                             channel = subtitle,
-                            channelUrl = null,
+                            channelUrl = artistBrowseId.asChannelUrl(),
                             thumbnail = thumb,
                             avatar = null,
                             durationSec = 0L,
@@ -1468,6 +1471,7 @@ object InnerTube {
                 if (!vid.isNullOrEmpty()) {
                     val title = obj.text("title") ?: "Track"
                     val artist = obj.text("longBylineText") ?: obj.text("shortBylineText") ?: ""
+                    val artistBrowseId = obj.firstBrowseId("longBylineText") ?: obj.firstBrowseId("shortBylineText")
                     val thumb = highResMusicThumbnail(
                         obj.optJSONObject("thumbnail")?.thumbnails()?.lastOrNull()
                     )
@@ -1476,7 +1480,7 @@ object InnerTube {
                             id = vid,
                             title = title,
                             channel = artist,
-                            channelUrl = null,
+                            channelUrl = artistBrowseId.asChannelUrl(),
                             thumbnail = thumb,
                             avatar = null,
                             durationSec = 0L,
@@ -1521,6 +1525,7 @@ object InnerTube {
                     if (renderer.optBoolean("selected")) currentIndex = items.size
                     val title = renderer.text("title") ?: "Track"
                     val artist = renderer.text("longBylineText") ?: renderer.text("shortBylineText") ?: ""
+                    val artistBrowseId = renderer.firstBrowseId("longBylineText") ?: renderer.firstBrowseId("shortBylineText")
                     val thumb = highResMusicThumbnail(
                         renderer.optJSONObject("thumbnail")?.thumbnails()?.lastOrNull()
                     )
@@ -1529,7 +1534,7 @@ object InnerTube {
                             id = vid,
                             title = title,
                             channel = artist,
-                            channelUrl = null,
+                            channelUrl = artistBrowseId.asChannelUrl(),
                             thumbnail = thumb,
                             avatar = null,
                             durationSec = renderer.text("lengthText")?.let(::parseDuration) ?: 0L,
@@ -1673,6 +1678,14 @@ object InnerTube {
         }.getOrDefault(emptyList())
     }
 
+    /** Artist page shelves (Albums, Singles, Songs, Videos…) for a music
+     *  artist browse id. Uses the WEB_REMIX browse endpoint, which returns the
+     *  full discography — unlike the NewPipe channel extractor, which hangs on
+     *  auto-generated "Topic" channels. */
+    suspend fun musicArtistShelves(browseId: String): List<MusicShelf> = withContext(Dispatchers.IO) {
+        parseMusicShelves(postMusic("browse", JSONObject().put("browseId", browseId)))
+    }
+
     suspend fun resolveMusicItem(item: MusicShelfItem): VideoItem? = withContext(Dispatchers.IO) {
         if (!item.videoId.isNullOrEmpty()) {
             return@withContext item.toVideoItem()
@@ -1808,12 +1821,13 @@ object InnerTube {
                         ?: ep?.optJSONObject("browseEndpoint")?.optString("browseId")?.takeIf { it.startsWith("VL") }?.removePrefix("VL")
                     val browseId = ep?.optJSONObject("browseEndpoint")?.optString("browseId")
                         ?.takeUnless { it.startsWith("MPED") }
+                    val artistBrowseId = twoRow.firstBrowseId("subtitle")
                     val thumb = highResMusicThumbnail(
                         twoRow.optJSONObject("thumbnailRenderer")
                             ?.optJSONObject("musicThumbnailRenderer")
                             ?.optJSONObject("thumbnail")?.thumbnails()?.lastOrNull()
                     )
-                    items.add(MusicShelfItem(itemTitle, itemSub, thumb, vid, browseId, playlistId))
+                    items.add(MusicShelfItem(itemTitle, itemSub, thumb, vid, browseId, playlistId, artistBrowseId))
                 } else if (responsive != null) {
                     val playEp = responsive.optJSONObject("overlay")
                         ?.optJSONObject("musicItemThumbnailOverlayRenderer")
@@ -1830,12 +1844,13 @@ object InnerTube {
                     val col1 = flexCols?.optJSONObject(1)?.optJSONObject("musicResponsiveListItemFlexColumnRenderer")
                     val itemTitle = col0?.text("text") ?: continue
                     val itemSub = col1?.text("text") ?: ""
+                    val artistBrowseId = col1?.firstBrowseId("text")
                     val thumb = highResMusicThumbnail(
                         responsive.optJSONObject("thumbnail")
                             ?.optJSONObject("musicThumbnailRenderer")
                             ?.optJSONObject("thumbnail")?.thumbnails()?.lastOrNull()
                     )
-                    items.add(MusicShelfItem(itemTitle, itemSub, thumb, vid, null, playlistId))
+                    items.add(MusicShelfItem(itemTitle, itemSub, thumb, vid, null, playlistId, artistBrowseId))
                 }
             }
             if (items.isNotEmpty()) {
@@ -2720,6 +2735,25 @@ internal fun JSONObject.text(key: String): String? {
     val runs = o.optJSONArray("runs") ?: return null
     return (0 until runs.length()).joinToString("") { runs.optJSONObject(it)?.optString("text").orEmpty() }.ifBlank { null }
 }
+
+/** First channel (UC…) browse id in a text run field — the artist behind a song's
+ *  byline. Music bylines are "runs" whose first run links the artist. */
+internal fun JSONObject.firstBrowseId(key: String): String? {
+    val o = optJSONObject(key) ?: return null
+    val runs = o.optJSONArray("runs") ?: return null
+    for (i in 0 until runs.length()) {
+        val id = runs.optJSONObject(i)
+            ?.optJSONObject("navigationEndpoint")
+            ?.optJSONObject("browseEndpoint")
+            ?.optString("browseId")
+            ?.takeIf { it.startsWith("UC") && it.length > 2 }
+        if (id != null) return id
+    }
+    return null
+}
+
+internal fun String?.asChannelUrl(): String? =
+    this?.takeIf { it.startsWith("UC") && it.length > 2 }?.let { "https://www.youtube.com/channel/$it" }
 
 
 internal fun JSONObject.thumbnails(): List<String>? {
