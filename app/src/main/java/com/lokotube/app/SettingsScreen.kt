@@ -1045,6 +1045,7 @@ private fun VersionHistoryContent() {
     // the release list from GitHub and force-closed when its LazyColumn was
     // measured inside the scrolling dialog. A static list cannot crash.
     val entries = listOf(
+        Triple("0.1.6", "12 Nov 2026", "Blokir channel (tekan-tahan video untuk menyembunyikan dari beranda & rekomendasi) dan halaman artis musik: ketuk nama penyanyi untuk membuka daftar lagu & album sang artis."),
         Triple("0.1.5", "10 Nov 2026", "Volume boost (Penguat Volume) & perbaikan equalizer, tombol Bagikan LokoTube, dan pembersihan internal (paket penuh LokoTube)."),
         Triple("0.1.4", "9 Nov 2026", "Layar onboarding saat buka pertama (logo, fitur unggulan, pilih bahasa Indonesia/English). Serta perbaikan tampilan logo."),
         Triple("0.1.3", "9 Nov 2026", "Widget mini player (mundur/putar-jeda/maju/perluas/tutup), kontrol player tanpa delay (hapus jeda 1 detik tombol tengah), rapikan changelog."),
