@@ -91,6 +91,7 @@ import androidx.compose.material.icons.rounded.Storage
 import androidx.compose.material.icons.rounded.SystemUpdate
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.Translate
+import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Autorenew
 import androidx.compose.material.icons.rounded.BatteryChargingFull
@@ -260,6 +261,20 @@ fun SettingsScreen(
                         title = I18n.t("equalizer", "Equalizer"),
                         subtitle = I18n.t("equalizer_sub", "Adjust bass, treble & presets"),
                         onClick = { activeFloatingSection = SettingsFloatingSection.EQUALIZER },
+                    )
+                }
+
+                SettingsSectionHeader(I18n.t("content_section", "Content"))
+                SettingsCard {
+                    SettingsRow(
+                        icon = Icons.Rounded.VisibilityOff,
+                        title = I18n.t("blocked_channels", "Blocked channels"),
+                        subtitle = if (BlockedChannels.channels.isEmpty())
+                            I18n.t("blocked_channels_sub", "Don't show videos from these channels")
+                        else
+                            I18n.t("blocked_channels_count", "{n} channel(s) hidden").replace("{n}", BlockedChannels.channels.size.toString()),
+                        onClick = { activeFloatingSection = SettingsFloatingSection.BLOCKED_CHANNELS },
+                        padded = false,
                     )
                 }
 
@@ -523,6 +538,15 @@ fun SettingsScreen(
                         SupportDeveloperContent()
                     }
                 }
+                SettingsFloatingSection.BLOCKED_CHANNELS -> {
+                    SettingsFloatingDialog(
+                        title = I18n.t("blocked_channels", "Blocked channels"),
+                        subtitle = I18n.t("blocked_channels_sub", "Don't show videos from these channels"),
+                        onDismiss = { activeFloatingSection = null },
+                    ) {
+                        BlockedChannelsContent()
+                    }
+                }
                 null -> {}
             }
         }
@@ -750,6 +774,7 @@ private enum class SettingsFloatingSection {
     VERSION_HISTORY,
     SUPPORT,
     EQUALIZER,
+    BLOCKED_CHANNELS,
 }
 
 @Composable
@@ -904,6 +929,50 @@ private fun SettingsRow(
                 tint = c.onSurfaceVariant.copy(alpha = 0.5f),
                 modifier = Modifier.size(18.dp),
             )
+        }
+    }
+}
+
+@Composable
+private fun BlockedChannelsContent() {
+    val c = MaterialTheme.colorScheme
+    val blocked = BlockedChannels.channels
+    Column(Modifier.padding(horizontal = 20.dp).padding(vertical = 8.dp)) {
+        if (blocked.isEmpty()) {
+            Text(
+                I18n.t("no_blocked_channels", "No blocked channels yet. Long-press a video and choose \"Don't recommend this channel\"."),
+                color = c.onSurfaceVariant,
+                fontSize = 14.sp,
+                lineHeight = 20.sp,
+                modifier = Modifier.padding(vertical = 12.dp),
+            )
+        } else {
+            blocked.forEach { ch ->
+                Row(
+                    Modifier.fillMaxWidth().padding(vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        ch.name.ifBlank { ch.id },
+                        color = c.onSurface,
+                        fontSize = 14.5.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.weight(1f),
+                        maxLines = 1,
+                    )
+                    Box(
+                        Modifier.size(40.dp).pressable { BlockedChannels.unblock(ch.id) },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            Icons.Rounded.Close,
+                            contentDescription = I18n.t("unblock", "Unblock"),
+                            tint = c.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
+                }
+            }
         }
     }
 }

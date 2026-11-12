@@ -921,6 +921,7 @@ class PlayerState(private val scope: CoroutineScope) {
         val out = ArrayList<VideoItem>()
         for (entry in related) {
             if (entry.id == currentItem.id) continue
+            if (BlockedChannels.blocks(entry)) continue
             val tokens = titleTokens(entry.title)
             if (keptTokens.any { sameContent(tokens, it) }) continue
             val channelKey = entry.channel.lowercase()
@@ -950,6 +951,7 @@ class PlayerState(private val scope: CoroutineScope) {
         val pool = feed.distinctBy { it.id }.filter { entry ->
             entry.id != currentItem.id &&
                 entry.id !in collapsedIds &&
+                !BlockedChannels.blocks(entry) &&
                 !sameContent(titleTokens(entry.title), currentTokens)
         }
         if (pool.isEmpty()) return collapsed

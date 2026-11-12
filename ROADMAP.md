@@ -5,11 +5,10 @@ Dikembangkan lanjutan oleh Lokotre (Rizal). v0.1.5 (versionCode 6).
 
 ## RENCANA BESOK (urut prioritas)
 
-1. Blokir channel — tekan-tahan video → "Jangan rekomendasikan channel ini" → filter dari beranda/terkait. (effort kecil-menengah)
-2. DeArrow (judul dulu) — query sponsor.ajay.app per video → timpa judul clickbait. Thumbnail menyusul.
-3. Skip silence (musik) — lewati hening otomatis saat mode musik. (menengah)
-4. Bagikan dengan timestamp — link video mulai dari menit tertentu (t=…).
-5. Pantau F-Droid RFP (gitlab.com/fdroid/rfp) + issue IzzyOnDroid #848 — balas kalau ada pertanyaan.
+1. DeArrow (judul dulu) — query sponsor.ajay.app per video → timpa judul clickbait. Thumbnail menyusul.
+2. Skip silence (musik) — lewati hening otomatis saat mode musik. (menengah)
+3. Bagikan dengan timestamp — link video mulai dari menit tertentu (t=…).
+4. Pantau F-Droid RFP (gitlab.com/fdroid/rfp) + issue IzzyOnDroid #848 — balas kalau ada pertanyaan.
 
 ## SARAN PENGEMBANGAN (berkaca ke aplikasi lain)
 
@@ -49,3 +48,4 @@ Dikembangkan lanjutan oleh Lokotre (Rizal). v0.1.5 (versionCode 6).
 - Widget mini player (prev/play/next), onboarding layar pertama, tombol Bagikan LokoTube, buka tautan YouTube (deep-link).
 - Flavor build `github` (updater) + `fdroid` (tanpa updater untuk F-Droid).
 - Pengajuan F-Droid (RFP) + issue IzzyOnDroid #848 (decline karena kebijakan LLM, scan APK bersih).
+- Blokir channel — tekan-tahan video → "Jangan rekomendasikan channel ini" → hilang dari beranda + rekomendasi (related/interleave/musik); daftar + buka blokir di Setelan → Konten → Channel diblokir.

@@ -228,6 +228,9 @@ fun FeedList(
 
     videos: List<VideoItem>? = null,
 
+    /** Buang video dari channel yang diblokir (beranda/rekomendasi). */
+    hideBlocked: Boolean = false,
+
     filterScrollKey: Any? = null,
 
     channelAvatarSeed: Map<String, String?> = emptyMap(),
@@ -237,7 +240,10 @@ fun FeedList(
     gridHeader: (@Composable () -> Unit)? = null,
 ) {
     val c = MaterialTheme.colorScheme
-    val listVideos = videos ?: feed.videos
+    val rawVideos = videos ?: feed.videos
+    val listVideos = remember(rawVideos, hideBlocked, BlockedChannels.channels) {
+        if (hideBlocked) rawVideos.filter { v -> !BlockedChannels.blocks(v) } else rawVideos
+    }
     val scope = rememberCoroutineScope()
     LaunchedEffect(listVideos, channelAvatarSeed) {
         ChannelAvatars.resolve(scope, listVideos, channelAvatarSeed)

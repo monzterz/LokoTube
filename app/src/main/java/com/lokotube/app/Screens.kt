@@ -272,6 +272,7 @@ fun HomeScreen(
                 scrollToTop = scrollToTop,
                 indicatorTop = top,
                 videos = filteredVideos,
+                hideBlocked = true,
                 filterScrollKey = activeFilter,
                 header = {
                     if (!signedIn) {

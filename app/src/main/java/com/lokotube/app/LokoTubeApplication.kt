@@ -55,6 +55,7 @@ class LokoTubeApplication : Application(), ImageLoaderFactory {
         SearchHistory.init(this)
         Downloads.init(this)
         LocalPlaylists.init(this)
+        BlockedChannels.load()
         AudioEffects.load()
         Onboarding.init(this)
 

@@ -72,6 +72,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import android.widget.Toast
 import androidx.compose.material.icons.rounded.BookmarkAdd
+import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -124,6 +125,13 @@ fun VideoOptionsSheet(video: VideoItem, player: PlayerState, onDismiss: () -> Un
             OptionRow(Icons.Rounded.BookmarkAdd, I18n.t("save_to_local_playlist", "Save to playlist")) { picking = true }
             if (Account.signedIn) {
                 OptionRow(Icons.Rounded.WatchLater, I18n.t("save_to_watch_later", "Save to Watch later")) { player.saveToWatchLater(video); onDismiss() }
+            }
+            if (video.channel.isNotBlank()) {
+                OptionRow(Icons.Rounded.VisibilityOff, I18n.t("block_channel", "Don't recommend this channel")) {
+                    BlockedChannels.block(video)
+                    Toast.makeText(context, I18n.t("block_channel_toast", "This channel won't be recommended anymore"), Toast.LENGTH_SHORT).show()
+                    onDismiss()
+                }
             }
             OptionRow(Icons.Rounded.Share, I18n.t("share", "Share")) {
                 val send = Intent(Intent.ACTION_SEND).setType("text/plain")
@@ -241,7 +249,7 @@ fun MusicQueuePanel(player: PlayerState, onDismiss: () -> Unit) {
             val endpoint = page.relatedEndpoint ?: return@runCatching
             val queuedIds = player.musicQueue.map { it.id }.toHashSet()
             related = InnerTube.musicRelated(endpoint)
-                .filter { it.id != currentId && it.id !in queuedIds }
+                .filter { it.id != currentId && it.id !in queuedIds && !BlockedChannels.blocks(it) }
                 .take(20)
         }
     }
