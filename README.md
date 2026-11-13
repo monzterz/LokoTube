@@ -24,17 +24,19 @@
 
 ## Features
 
-- **Liquid Glass UI** - Frosted glass aesthetic across the player, Shorts, fullscreen controls, settings, and music mini player
-- **Multilingual Support** - Multiple languages support across the entire app
-- **2 Mini Player Styles** - Modern YouTube-style floating draggable miniplayer and classic Liquid Glass dock
-- **Ad-Free Playback** - Ad-free YouTube and YouTube Music playback
-- **Personalised Shorts** - Endless Shorts feed with a one-tap fresh batch and loading animation
-- **Synced Lyrics** - Synced lyrics with an Apple Music-style animated lyric view
-- **High-Quality Downloads** - High-speed video and audio downloads up to 4K / HDR
-- **4K HDR Playback** - 4K HDR playback and customizable fixed resolution quality lock
-- **Search & Explore** - Search, channels, playlists, and community posts
-- **Background & PiP** - Background playback and Picture-in-Picture
-- **Android TV Support** - Dedicated TV mode with full D-pad remote navigation
+- **Liquid Glass UI** — frosted-glass aesthetic across the player, Shorts, fullscreen controls, settings, and music mini player
+- **Ad-Free Playback** — ad-free YouTube and YouTube Music streaming
+- **Music mode** — artist pages (tap a song's artist to open their songs & albums), radio/autoplay, equalizer + volume boost, synced lyrics
+- **SponsorBlock & Return YouTube Dislike** — skip sponsor segments and bring back dislikes
+- **Block channels** — long-press a video to hide a channel from Home & recommendations
+- **High-Quality Downloads** — video & audio (MP3) downloads up to 4K / HDR, with bulk download
+- **4K HDR Playback** — 4K HDR playback with a fixed-resolution quality lock
+- **Background & PiP** — background playback, picture-in-picture, and a sleep timer
+- **Mini player & widget** — two mini-player styles plus a home-screen widget with previous/play/next
+- **Chapters & search** — video chapters, search, channels, playlists, community posts, and deep-link opening of YouTube links
+- **Import / Export** — subscriptions (CSV) & local playlists (JSON)
+- **Multilingual** — Indonesian & English, extensible
+- **Android TV Support** — dedicated TV mode with full D-pad remote navigation
 
 ---
 
@@ -54,11 +56,15 @@ LokoTube is an independent, open-source project and is **not affiliated with or 
 
 ## Build
 
+Requires JDK 21 and the Android SDK (build-tools 36.1.0).
+
 ```bash
-./gradlew :app:assembleRelease
+./gradlew assembleGithubDebug     # debug build (self-updater enabled)
+./gradlew assembleGithubRelease   # signed release (GitHub flavor)
+./gradlew assembleFdroidRelease   # F-Droid flavor (no self-updater)
 ```
 
-The release APK is written to `app/build/outputs/apk/release/app-release.apk`.
+APKs are written under `app/build/outputs/apk/<flavor>/<variant>/`.
 
 ---
 
