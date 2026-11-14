@@ -766,9 +766,26 @@ private fun ArtistSongRow(
         modifier = Modifier
             .fillMaxWidth()
             .pressable(pressedScale = 0.97f, onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        Box(
+            modifier = Modifier
+                .size(48.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(c.surfaceContainerHighest),
+        ) {
+            AsyncImage(
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(highResMusicThumbnail(song.thumbnail) ?: sharpenFeedThumbnail(null, song.id))
+                    .crossfade(!GlassSettings.liteMode)
+                    .build(),
+                contentDescription = song.title,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+        Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(
                 song.title,
