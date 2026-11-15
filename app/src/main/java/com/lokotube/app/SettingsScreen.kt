@@ -2487,6 +2487,29 @@ private fun SettingsProfileCard(
                     )
                 }
 
+                val channels = Account.channels
+                val activePageId = Account.activePageId
+                if (channels.size > 1) {
+                    HorizontalDivider(color = c.onSurface.copy(alpha = 0.08f), modifier = Modifier.padding(vertical = 6.dp))
+                    Text(
+                        I18n.t("choose_channel", "Choose channel"),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = c.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 2.dp),
+                    )
+                    channels.forEach { ch ->
+                        SettingsChannelRow(
+                            channel = ch,
+                            active = (activePageId ?: "") == ch.pageId,
+                            onSwitch = {
+                                Account.selectChannel(ch.pageId.ifBlank { null })
+                                onAccountSwitched()
+                            },
+                        )
+                    }
+                }
+
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -2528,6 +2551,57 @@ private fun SettingsProfileCard(
                     Spacer(Modifier.width(10.dp))
                     Text(I18n.t("sign_out", "Sign out"), fontWeight = FontWeight.Medium, fontSize = 13.sp, color = c.error)
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SettingsChannelRow(
+    channel: YoutubeChannel,
+    active: Boolean,
+    onSwitch: () -> Unit,
+) {
+    val c = MaterialTheme.colorScheme
+    val background by animateColorAsState(
+        targetValue = if (active) c.primaryContainer.copy(alpha = 0.55f) else Color.Transparent,
+        animationSpec = tween(260),
+        label = "channelBackground",
+    )
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 2.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(background)
+            .pressable(onClick = onSwitch)
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (channel.avatar != null) {
+            ChannelAvatar(channel.avatar, channel.name, size = 32)
+        } else {
+            Box(
+                Modifier.size(32.dp).clip(CircleShape).background(c.surfaceContainerHigh),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(Icons.Rounded.AccountCircle, null, tint = c.onSurfaceVariant, modifier = Modifier.size(20.dp))
+            }
+        }
+        Spacer(Modifier.width(10.dp))
+        Column(Modifier.weight(1f)) {
+            Text(channel.name, fontWeight = FontWeight.Medium, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            channel.handle?.let { Text(it, fontSize = 11.sp, color = c.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+        }
+        if (active) {
+            Box(
+                Modifier
+                    .size(20.dp)
+                    .clip(CircleShape)
+                    .background(c.primary),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(Icons.Rounded.Check, I18n.t("active_account", "Active account"), tint = c.onPrimary, modifier = Modifier.size(13.dp))
             }
         }
     }

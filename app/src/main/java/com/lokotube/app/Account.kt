@@ -138,6 +138,17 @@ data class AccountSummary(
     val email: String? = null,
 )
 
+/** A YouTube identity under one Google login: the primary account plus any
+ *  brand channels. Switching is done via InnerTube's delegated session
+ *  (context.user.onBehalfOfUser = pageId). */
+@Immutable
+data class YoutubeChannel(
+    val pageId: String,
+    val name: String,
+    val handle: String?,
+    val avatar: String?,
+)
+
 object Account {
     var profile by mutableStateOf<Profile?>(null)
         private set
@@ -148,6 +159,14 @@ object Account {
         private set
 
     var activeAccountId by mutableStateOf<String?>(null)
+        private set
+
+    /** YouTube identities (primary + brand channels) under the active account. */
+    var channels by mutableStateOf<List<YoutubeChannel>>(emptyList())
+        private set
+
+    /** Selected channel's pageId; null = the account's primary channel. */
+    var activePageId by mutableStateOf<String?>(null)
         private set
 
     private data class StoredAccount(
@@ -223,6 +242,8 @@ object Account {
             profile = null
         }
         publish()
+        loadChannels()
+        if (signedIn) refreshChannels()
 
         if (entries.isNotEmpty()) {
             kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
@@ -344,6 +365,7 @@ object Account {
                     }
                 }
             }
+            refreshChannels()
         }
     }
 
@@ -481,8 +503,14 @@ object Account {
         load(target)
         activeAccountId = id
         profile = Profile(target.name, target.handle, target.avatar)
+        // Channel identity is per-account: reset and re-fetch for the new account.
+        channels = emptyList()
+        activePageId = null
+        store?.put(KEY_CHANNELS, null)
+        store?.put(KEY_PAGE_ID, null)
         persistAccounts()
         publish()
+        refreshChannels()
         StreamCache.invalidateAll()
         CaptionTracks.invalidateAll()
         runCatching {
@@ -521,7 +549,10 @@ object Account {
         store?.apply {
             put(KEY_COOKIES, null); put(KEY_CLIENT_VERSION, null); put(KEY_VISITOR, null)
             put(KEY_NAME, null); put(KEY_HANDLE, null); put(KEY_AVATAR, null)
+            put(KEY_CHANNELS, null); put(KEY_PAGE_ID, null)
         }
+        channels = emptyList()
+        activePageId = null
         persistAccounts()
         publish()
         StreamCache.invalidateAll()
@@ -538,6 +569,66 @@ object Account {
         entries.removeAll { it.id == id }
         persistAccounts()
         publish()
+    }
+
+    /** Switches the active YouTube identity (brand channel) without signing out.
+     *  pageId = null selects the account's primary channel. */
+    fun selectChannel(pageId: String?) {
+        activePageId = pageId?.takeIf { it.isNotBlank() }
+        store?.put(KEY_PAGE_ID, activePageId)
+    }
+
+    /** Loads the account's YouTube identities (primary + brand channels). */
+    fun refreshChannels() {
+        if (!signedIn) return
+        kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+            val list = runCatching { InnerTube.accountsList() }.getOrDefault(emptyList())
+            withContext(Dispatchers.Main) {
+                channels = list
+                persistChannels()
+                val ch = activePageId?.let { pid -> list.firstOrNull { it.pageId == pid } }
+                if (ch != null && signedIn) {
+                    profile = Profile(ch.name, ch.handle, ch.avatar)
+                    store?.apply { put(KEY_NAME, ch.name); put(KEY_HANDLE, ch.handle); put(KEY_AVATAR, ch.avatar) }
+                }
+            }
+        }
+    }
+
+    private fun persistChannels() {
+        val arr = JSONArray()
+        channels.forEach { c ->
+            arr.put(
+                JSONObject()
+                    .put("pageId", c.pageId)
+                    .put("name", c.name)
+                    .put("handle", c.handle ?: "")
+                    .put("avatar", c.avatar ?: ""),
+            )
+        }
+        store?.put(KEY_CHANNELS, arr.toString())
+    }
+
+    private fun loadChannels() {
+        val raw = store?.get(KEY_CHANNELS)
+        channels = runCatching {
+            val arr = JSONArray(raw ?: return@runCatching emptyList())
+            buildList {
+                for (i in 0 until arr.length()) {
+                    val o = arr.optJSONObject(i) ?: continue
+                    val pid = o.optString("pageId").takeIf { it.isNotBlank() } ?: continue
+                    add(
+                        YoutubeChannel(
+                            pid,
+                            o.optString("name"),
+                            o.optString("handle").takeIf { it.isNotBlank() },
+                            o.optString("avatar").takeIf { it.isNotBlank() },
+                        ),
+                    )
+                }
+            }
+        }.getOrDefault(emptyList())
+        activePageId = store?.get(KEY_PAGE_ID)?.takeIf { it.isNotBlank() }
     }
 
     private fun saveActive() {
@@ -727,6 +818,8 @@ object Account {
     private const val KEY_AVATAR = "avatar"
     private const val KEY_ACCOUNTS = "accounts"
     private const val KEY_ACTIVE = "active_account"
+    private const val KEY_CHANNELS = "channels"
+    private const val KEY_PAGE_ID = "page_id"
 }
 
 
@@ -757,18 +850,19 @@ object InnerTube {
 
     internal fun post(endpoint: String, body: JSONObject, anonymous: Boolean = false): JSONObject {
         val auth = if (anonymous) null else Account.authorization() ?: throw NotSignedInException()
-        body.put(
-            "context",
-            JSONObject().put(
-                "client",
-                JSONObject()
-                    .put("clientName", "WEB")
-                    .put("clientVersion", Account.clientVersion())
-                    .put("hl", LanguageSettings.effectiveLanguageCode())
-                    .put("gl", LanguageSettings.effectiveCountryCode())
-                    .apply { Account.visitorData()?.let { put("visitorData", it) } },
-            ),
+        val contextObj = JSONObject().put(
+            "client",
+            JSONObject()
+                .put("clientName", "WEB")
+                .put("clientVersion", Account.clientVersion())
+                .put("hl", LanguageSettings.effectiveLanguageCode())
+                .put("gl", LanguageSettings.effectiveCountryCode())
+                .apply { Account.visitorData()?.let { put("visitorData", it) } },
         )
+        Account.activePageId?.let { pageId ->
+            contextObj.put("user", JSONObject().put("onBehalfOfUser", pageId))
+        }
+        body.put("context", contextObj)
         val langCode = LanguageSettings.effectiveLanguageCode()
         val countryCode = LanguageSettings.effectiveCountryCode()
         val prefCookie = "PREF=hl=" + langCode + "&gl=" + countryCode
@@ -815,7 +909,9 @@ object InnerTube {
             "context",
             JSONObject()
                 .put("client", clientContext)
-                .put("user", JSONObject().put("lockedSafetyMode", false))
+                .put("user", JSONObject().put("lockedSafetyMode", false).apply {
+                    Account.activePageId?.let { put("onBehalfOfUser", it) }
+                })
         )
 
         val mlangCode = LanguageSettings.effectiveLanguageCode()
@@ -853,6 +949,41 @@ object InnerTube {
     suspend fun musicHome(): List<MusicShelf> = withContext(Dispatchers.IO) {
         val root = postMusic("browse", JSONObject().put("browseId", "FEmusic_home"))
         parseMusicShelves(root)
+    }
+
+    /** Lists the YouTube identities (primary account + brand channels) available
+     *  under the current login, for the in-app channel picker. */
+    suspend fun accountsList(): List<YoutubeChannel> = withContext(Dispatchers.IO) {
+        if (!Account.signedIn) return@withContext emptyList()
+        val root = runCatching {
+            post("account/accounts_list", JSONObject())
+        }.onFailure { android.util.Log.w("LokoTube", "accounts_list failed: $it") }
+            .getOrNull() ?: return@withContext emptyList()
+        val list = parseChannels(root)
+        android.util.Log.i("LokoTube", "accounts_list: ${list.size} channels")
+        list
+    }
+
+    private fun parseChannels(root: JSONObject): List<YoutubeChannel> {
+        val out = LinkedHashMap<String, YoutubeChannel>()
+        root.walk { _, obj ->
+            val ep = obj.optJSONObject("serviceEndpoint")?.optJSONObject("selectActiveIdentityEndpoint")
+                ?: return@walk
+            val tokens = ep.optJSONArray("supportedTokens") ?: return@walk
+            var brandId: String? = null
+            for (i in 0 until tokens.length()) {
+                val pid = tokens.optJSONObject(i)?.optJSONObject("pageIdToken")?.optString("pageId")
+                if (!pid.isNullOrBlank()) { brandId = pid; break }
+            }
+            val name = obj.text("accountName") ?: obj.text("accountTitle") ?: "Channel"
+            val handle = obj.text("channelHandle")
+            val avatar = obj.optJSONObject("accountPhoto")?.thumbnails()?.lastOrNull()
+            // Primary account (no pageIdToken) is represented by an empty pageId
+            // (= no delegated session); brand channels carry their pageId.
+            val key = brandId ?: "primary"
+            out.putIfAbsent(key, YoutubeChannel(brandId.orEmpty(), name, handle, avatar))
+        }
+        return out.values.toList()
     }
 
 
