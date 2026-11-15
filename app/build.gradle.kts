@@ -163,7 +163,7 @@ dependencies {
     implementation("androidx.media3:media3-ui-compose:$media3")
 
     implementation("com.github.TeamNewPipe:NewPipeExtractor:v0.26.5")
-    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.squareup.okhttp3:okhttp:5.5.1")
     implementation("io.coil-kt:coil-compose:2.7.0")
     implementation("com.google.guava:guava:33.8.0-android")
 
