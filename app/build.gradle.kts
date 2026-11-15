@@ -165,7 +165,7 @@ dependencies {
     implementation("com.github.TeamNewPipe:NewPipeExtractor:v0.26.5")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("io.coil-kt:coil-compose:2.7.0")
-    implementation("com.google.guava:guava:33.3.1-android")
+    implementation("com.google.guava:guava:33.8.0-android")
 
 
     testImplementation("junit:junit:4.13.2")
