@@ -39,7 +39,7 @@ jobs:
           P="$SDK/platforms"; [ -d "$P/android-37.0" ] && [ ! -e "$P/android-37" ] && ln -sfn android-37.0 "$P/android-37" || true
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
+        uses: github/codeql-action/init@v4
         with:
           languages: java-kotlin
 
@@ -49,6 +49,6 @@ jobs:
           ./gradlew assembleGithubDebug --no-daemon
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v3
+        uses: github/codeql-action/analyze@v4
         with:
           category: "/language:java-kotlin"
