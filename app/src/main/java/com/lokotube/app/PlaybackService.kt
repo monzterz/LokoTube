@@ -285,11 +285,19 @@ private class StreamRecoverer(
         val position = player.currentPosition
         if (id == lastId && position < lastPositionMs + PROGRESS_MS) {
             Log.w("LokoTube", "stream refused again for $id at ${position / 1000}s; giving up")
+            PlaybackLog.event("recover_giveup", id, "pos" to (position / 1000))
             return
         }
         lastId = id
         lastPositionMs = position
         Log.i("LokoTube", "stream refused for $id; re-extracting and resuming at ${position / 1000}s")
+        PlaybackLog.event(
+            "recover_start", id,
+            "pos" to (position / 1000),
+            "url" to PlaybackLog.describeUrl(
+                (error.cause as? androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException)?.dataSpec?.uri?.toString()
+            ),
+        )
         StreamRecovery.failed = null
         StreamRecovery.recovering = id
         StreamCache.invalidate(id)
@@ -300,9 +308,13 @@ private class StreamRecoverer(
 
                 if (player.currentMediaItem?.mediaId != id || player.playerError == null) return@post
                 result
-                    .onSuccess { resume(item, position) }
+                    .onSuccess {
+                        PlaybackLog.event("recover_ok", id, "pos" to (position / 1000))
+                        resume(item, position)
+                    }
                     .onFailure {
                         Log.w("LokoTube", "re-extracting $id failed", it)
+                        PlaybackLog.event("recover_failed", id, "why" to it.javaClass.simpleName, "msg" to it.message?.take(120))
                         StreamRecovery.failed = id to YouTube.friendlyError(it)
                     }
             }

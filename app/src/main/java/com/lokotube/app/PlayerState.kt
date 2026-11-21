@@ -1675,8 +1675,18 @@ class PlayerState(private val scope: CoroutineScope) {
         }
 
         override fun onPlayerError(e: PlaybackException) {
-            val status = (e.cause as? androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException)?.responseCode
+            val httpCause = e.cause as? androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException
+            val status = httpCause?.responseCode
             Log.w(TAG, "playback error ${e.errorCodeName}${status?.let { " (HTTP $it)" } ?: ""} for ${current?.id}", e)
+            PlaybackLog.event(
+                "error",
+                current?.id,
+                "code" to e.errorCodeName,
+                "http" to status,
+                "url" to PlaybackLog.describeUrl(httpCause?.dataSpec?.uri?.toString()),
+                "pos" to (controller?.currentPosition?.div(1000)),
+                "firstFrame" to firstFrameRendered,
+            )
 
             if (e.errorCode == PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS && StreamRecovery.recovering == current?.id) return
             error = when (e.errorCode) {

@@ -13,8 +13,8 @@ android {
         applicationId = "com.lokotube.app"
         minSdk = 24
         targetSdk = 36
-        versionCode = 7
-        versionName = "0.1.6"
+        versionCode = 8
+        versionName = "0.1.7"
         // Overridden to true by the "tv" flavor only. Phone flavors keep the
         // tuned-for-handsets behaviour, byte for byte.
         buildConfigField("boolean", "TV_BUILD", "false")
@@ -174,7 +174,7 @@ dependencies {
     implementation("androidx.media3:media3-session:$media3")
     implementation("androidx.media3:media3-ui-compose:$media3")
 
-    implementation("com.github.TeamNewPipe:NewPipeExtractor:v0.26.5")
+    implementation("com.github.TeamNewPipe:NewPipeExtractor:v0.27.1")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("io.coil-kt:coil-compose:2.7.0")
     implementation("com.google.guava:guava:33.8.0-android")

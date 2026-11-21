@@ -309,7 +309,7 @@ object YouTube {
             }
         }
         val processedDescription = info.description?.let { d ->
-            if (d.type == Description.HTML) HtmlCompat.fromHtml(d.content, HtmlCompat.FROM_HTML_MODE_COMPACT).toString().trim()
+            if (d.type == org.schabi.newpipe.extractor.stream.Description.Type.HTML) HtmlCompat.fromHtml(d.content, HtmlCompat.FROM_HTML_MODE_COMPACT).toString().trim()
             else d.content.trim()
         }.orEmpty()
         VideoDetails(
@@ -523,7 +523,13 @@ object StreamCache {
         val running = inflight.putIfAbsent(id, mine)
         val task = running ?: mine.also { it.run() }
         try {
-            return task.get()
+            return task.get().also { info ->
+                PlaybackLog.event(
+                    "extract", id,
+                    "url" to PlaybackLog.describeUrl(StreamSelection.pick(info).let { p -> (p.video ?: p.muxed)?.content }),
+                    "muxed" to (StreamSelection.pick(info).muxed != null),
+                )
+            }
         } catch (e: ExecutionException) {
             throw e.cause ?: e
         } finally {

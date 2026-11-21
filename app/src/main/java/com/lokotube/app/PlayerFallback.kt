@@ -85,15 +85,18 @@ object PlayerFallback {
 
 
         val clients = listOf(
+            // ANDROID_VR with clientVersion 1.65.10 is dead: since 2026-08-17 YouTube
+            // answers every format with HTTP 403 for that pair (yt-dlp dropped it for the
+            // same reason). visionOS is the client the extractor itself uses now.
             ClientConfig(
-                name = "ANDROID_VR",
-                id = "28",
-                version = "1.65.10",
-                userAgent = "com.google.android.apps.youtube.vr.oculus/1.65.10 (Linux; U; Android 12L; eureka-user Build/SQ3A.220605.009.A1) gzip",
-                osName = "Android",
-                osVersion = "12L",
-                deviceMake = "Oculus",
-                deviceModel = "Quest 3",
+                name = "VISIONOS",
+                id = "101",
+                version = "1.04",
+                userAgent = "com.google.visionos.youtube/1.04(RealityDevice17,1; U; CPU visionOS 26_6_0 like Mac OS X;)",
+                osName = "visionOS",
+                osVersion = "26.6.0.23O770",
+                deviceMake = "Apple",
+                deviceModel = "RealityDevice17,1",
                 platform = "MOBILE"
             ),
             ClientConfig(

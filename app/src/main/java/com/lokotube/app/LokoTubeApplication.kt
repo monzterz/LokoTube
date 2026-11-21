@@ -34,7 +34,9 @@ class LokoTubeApplication : Application(), ImageLoaderFactory {
         YoutubeStreamExtractor.setPoTokenProvider(LokoTubePoTokenProvider(poTokenGenerator))
 
 
-        YoutubeStreamExtractor.setFetchIosClient(true)
+        // The extractor now picks its own clients (visionOS + WEB). Forcing the old IOS
+        // client is gone: YouTube refuses IOS/ANDROID format URLs without a token that
+        // cannot be generated any more, which surfaced as HTTP 403 mid-playback.
         HdrItags.install()
         ThemeSettings.init(this)
         HdrSupport.init(this)

@@ -82,6 +82,7 @@ import androidx.compose.material.icons.rounded.DataUsage
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.FileDownload
 import androidx.compose.material.icons.rounded.History
+import androidx.compose.material.icons.rounded.PlayCircleOutline
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Person
@@ -324,6 +325,17 @@ fun SettingsScreen(
                         onClick = {
                             if (!CrashLog.shareLatest(context)) {
                                 android.widget.Toast.makeText(context, I18n.t("crash_none", "No crash log recorded"), android.widget.Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        padded = false,
+                    )
+                    SettingsRow(
+                        icon = Icons.Rounded.PlayCircleOutline,
+                        title = I18n.t("playback_log", "Playback log"),
+                        subtitle = I18n.t("playback_log_sub", "Send the playback record (why a video failed)"),
+                        onClick = {
+                            if (!PlaybackLog.shareLatest(context)) {
+                                android.widget.Toast.makeText(context, I18n.t("playback_log_none", "No playback log recorded"), android.widget.Toast.LENGTH_SHORT).show()
                             }
                         },
                         padded = false,
@@ -1045,6 +1057,7 @@ private fun VersionHistoryContent() {
     // the release list from GitHub and force-closed when its LazyColumn was
     // measured inside the scrolling dialog. A static list cannot crash.
     val entries = listOf(
+        Triple("0.1.7", "22 Nov 2026", "Perbaikan pemutaran: mesin YouTube internal diperbarui (klien visionOS + web) — video yang tadinya ditolak dengan pesan \"YouTube menolak stream ini\" kembali bisa diputar. Tambah Log pemutaran di Setelan (kirim catatan teknis kalau ada video gagal)."),
         Triple("0.1.6", "12 Nov 2026", "Blokir channel (tekan-tahan video untuk menyembunyikan dari beranda & rekomendasi) dan halaman artis musik: ketuk nama penyanyi untuk membuka daftar lagu & album sang artis."),
         Triple("0.1.5", "10 Nov 2026", "Volume boost (Penguat Volume) & perbaikan equalizer, tombol Bagikan LokoTube, dan pembersihan internal (paket penuh LokoTube)."),
         Triple("0.1.4", "9 Nov 2026", "Layar onboarding saat buka pertama (logo, fitur unggulan, pilih bahasa Indonesia/English). Serta perbaikan tampilan logo."),
