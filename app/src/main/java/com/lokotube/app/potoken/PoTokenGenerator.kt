@@ -87,7 +87,9 @@ class PoTokenGenerator {
   }
 
   private companion object {
-    const val POTOKEN_TIMEOUT_MS = 8_000L
+    // BotGuard on a 1 GB projector box needs ~6-9 s to answer, so the 8 s
+    // handset budget lands right on the edge and the token never arrives.
+    val POTOKEN_TIMEOUT_MS = if (com.lokotube.app.BuildConfig.TV_BUILD) 30_000L else 8_000L
   }
 
   private suspend fun getWebClientPoToken(

@@ -15,6 +15,9 @@ android {
         targetSdk = 36
         versionCode = 7
         versionName = "0.1.6"
+        // Overridden to true by the "tv" flavor only. Phone flavors keep the
+        // tuned-for-handsets behaviour, byte for byte.
+        buildConfigField("boolean", "TV_BUILD", "false")
     }
 
     flavorDimensions += "channel"
@@ -26,6 +29,15 @@ android {
         create("fdroid") {
             dimension = "channel"
             buildConfigField("boolean", "UPDATES_ENABLED", "false")
+        }
+        // Projector / TV-box build. Separate applicationId so it can never be
+        // mistaken for, or installed over, the phone release.
+        create("tv") {
+            dimension = "channel"
+            applicationIdSuffix = ".tv"
+            versionNameSuffix = "-tv"
+            buildConfigField("boolean", "UPDATES_ENABLED", "false")
+            buildConfigField("boolean", "TV_BUILD", "true")
         }
     }
 

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Projector/TV-box build: distinct label so it is never confused with the
+         phone release (package com.lokotube.app.tv). -->
+    <string name="app_name">LokoTube TV</string>
+</resources>
