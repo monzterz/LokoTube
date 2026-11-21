@@ -680,6 +680,19 @@ class PlayerState(private val scope: CoroutineScope) {
                 .onSuccess { d ->
                     Log.i("LokoTubeTime", "details +${android.os.SystemClock.elapsedRealtime() - openedAt}ms")
                     details = d
+                    // The row that opened this video may not know the view count at all
+                    // (deep links, notifications, related items built from a lockup), which
+                    // showed up as "0 views" under the title. The watch page is authoritative.
+                    current = current?.takeIf { it.id == d.item.id }?.let { c ->
+                        c.copy(
+                            title = d.item.title.ifBlank { c.title },
+                            views = d.item.views.takeIf { it >= 0 } ?: c.views,
+                            uploaded = d.item.uploaded ?: c.uploaded,
+                            channel = d.item.channel.ifBlank { c.channel },
+                            channelUrl = d.item.channelUrl ?: c.channelUrl,
+                            avatar = d.item.avatar ?: c.avatar,
+                        )
+                    } ?: current
                     val collapsedRelated = diversifyRelated(d.related, item)
                     displayRelated = interleaveFeed(collapsedRelated, item)
                     // Seed the cross-page dedupe with page 1 so later

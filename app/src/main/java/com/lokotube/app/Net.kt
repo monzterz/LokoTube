@@ -53,7 +53,12 @@ object Net {
 class NewPipeDownloader private constructor(private val client: OkHttpClient) : Downloader() {
 
     override fun execute(request: Request): Response {
-        val langCode = runCatching { LanguageSettings.effectiveLanguageCode() }.getOrNull() ?: "en"
+        // Metadata text from the extractor is parsed with English-format parsers
+        // ("14.8M subscribers", "6,996,335 views"). Asking YouTube for Indonesian
+        // text makes those parsers read "14,8 jt subscriber" as 14 and breaks the
+        // view count, so extractor requests are always English while the UI keeps
+        // the user's language. Content country stays the user's own.
+        val langCode = EXTRACTOR_LANG
         val countryCode = runCatching { LanguageSettings.effectiveCountryCode() }.getOrNull() ?: "US"
         val isYouTube = request.url().contains("youtube.com") || request.url().contains("youtubei")
 
@@ -138,5 +143,8 @@ class NewPipeDownloader private constructor(private val client: OkHttpClient) : 
 
     companion object {
         val instance: NewPipeDownloader by lazy { NewPipeDownloader(Net.client) }
+
+        /** Language the extractor asks YouTube for; its parsers are English-only. */
+        private const val EXTRACTOR_LANG = "en"
     }
 }

@@ -63,7 +63,12 @@ class PlaybackService : MediaSessionService() {
         super.onCreate()
 
         val sources = YouTubeMediaSourceFactory(this)
-        val player = ExoPlayer.Builder(this, SyncedRenderersFactory(this))
+        // Weak TV boxes (Amlogic) can lose their hardware decoder mid-stream; without the
+        // fallback the picture dies while audio keeps playing. Handsets keep the default so
+        // their playback path is untouched.
+        val renderers = SyncedRenderersFactory(this)
+            .setEnableDecoderFallback(BuildConfig.TV_BUILD)
+        val player = ExoPlayer.Builder(this, renderers)
             .setMediaSourceFactory(sources)
             .setBandwidthMeter(PlaybackBandwidth.get())
 
