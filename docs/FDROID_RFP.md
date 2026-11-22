@@ -49,3 +49,28 @@ Build command: `./gradlew assembleFdroidRelease`
   Levi Setiadi, modifikasi LokoTube dikerjakan dengan bantuan AI (Claude/Hermes),
   direview + dites manual oleh pengembang manusia.
 - Referensi: issue IzzyOnDroid #848 (APK scan result: 0 offending libraries).
+
+## Komentar susulan untuk RFP #4764 (siap tempel)
+
+Hi, a status update on the scanner flags from the v0.1.5 scan. Since then the app has
+shipped v0.1.7, v0.1.8 and v0.1.9; the current release is **v0.1.9 (versionCode 10)**.
+
+Both scanner errors are fixed and can be checked against upstream checksums:
+
+- `gradle/wrapper/gradle-wrapper.jar` sha256 `7a9ce74cff467ca1bf60a4fcd9f05185acceda4d0f382434d393e17864262c5d`
+  is the official Wrapper JAR for Gradle 9.7.1 (https://gradle.org/release-checksums/).
+- `gradle/wrapper/gradle-wrapper.properties` pins
+  `distributionSha256Sum=acd53f1edaf02f1a8ff99879f8a34b302661a057d9b063ae9e35b552f804d20a`
+  (the official 9.7.1 binary ZIP checksum).
+- `settings.gradle.kts` no longer references `org.gradle.toolchains.foojay-resolver`.
+
+On the tracker flag: `opencensus-api` / `opencensus-proto` are pulled in by the Android
+Gradle Plugin build tooling only. The built APK contains no `io/opencensus` classes
+(checked by scanning `classes*.dex` of the v0.1.9 APK), so the "no trackers" claim holds.
+
+Build recipe for this app: `gradle: - fdroid` (`./gradlew assembleFdroidRelease`). That
+flavor ships without the in-app self-updater and without `REQUEST_INSTALL_PACKAGES`
+(verified with aapt2 on the built APK).
+
+Would it be possible to re-run the scanner against v0.1.9 so the stale labels are
+cleared? Happy to provide anything else that helps.
