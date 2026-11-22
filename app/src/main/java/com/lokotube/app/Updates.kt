@@ -131,7 +131,7 @@ suspend fun fetchReleaseHistory(): List<ReleaseEntry> = withContext(Dispatchers.
                         version = tag.removePrefix("v").removePrefix("V").trim(),
                         tag = tag,
                         name = json.optString("name").ifBlank { tag },
-                        body = json.optString("body").orEmpty(),
+                        body = json.releaseBody(),
                         publishedAt = json.optString("published_at"),
                         prerelease = json.optBoolean("prerelease"),
                     ),
@@ -155,12 +155,20 @@ suspend fun fetchReleaseHistory(): List<ReleaseEntry> = withContext(Dispatchers.
  * Shown when the GitHub release body is empty (or when testing an APK that is
  * newer than the latest published release). Keep this in sync with the build.
  */
+/**
+ * A release without a body comes back as JSON null, and org.json's optString turns
+ * that into the literal text "null" — which used to be printed under "What's new".
+ */
+private fun JSONObject.releaseBody(): String {
+    if (isNull("body")) return ""
+    return optString("body").trim().takeUnless { it.isEmpty() || it.equals("null", ignoreCase = true) }.orEmpty()
+}
+
 internal val RELEASE_NOTES = """
-    • LokoTube 0.0.6 test-1: channel Live tab gets Latest / Popular / Oldest sort chips with full paging, and video rows now show the view count together with the upload time in every language.
-    • LokoTube 0.0.5: Indonesian is now the default language with the full interface translated, video descriptions can be selected and copied, and viewer counts use Indonesian formatting (rb, jt, M).
-    • Ad-free YouTube and YouTube Music playback with a Liquid Glass UI.
-    • Personalised Shorts feed, synced lyrics, and high-quality downloads up to 4K HDR.
-    • Background playback, Picture-in-Picture, and Android TV mode.
+    • Pemutaran diperbaiki: mesin YouTube internal memakai klien visionOS, jadi video yang tadinya ditolak ("YouTube menolak stream ini") bisa diputar lagi.
+    • Angka di halaman video sudah benar: jumlah tayangan tidak lagi 0 dan jumlah subscriber tidak lagi terpotong.
+    • Log pemutaran di Setelan untuk mengirim catatan kalau ada video yang gagal.
+    • Putar YouTube & YouTube Music tanpa iklan, unduhan sampai 4K HDR, pemutaran latar, PiP, dan mode Android TV.
 """.trimIndent()
 
 /**
@@ -298,7 +306,7 @@ class UpdateState(private val scope: CoroutineScope) {
             return UpdateInfo(
                 version = version,
                 tag = tag,
-                notes = json.optString("body").orEmpty(),
+                notes = json.releaseBody(),
                 apkUrl = url,
                 sizeBytes = size,
                 htmlUrl = json.optString("html_url").orEmpty(),

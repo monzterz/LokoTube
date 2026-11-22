@@ -13,8 +13,8 @@ android {
         applicationId = "com.lokotube.app"
         minSdk = 24
         targetSdk = 36
-        versionCode = 9
-        versionName = "0.1.8"
+        versionCode = 10
+        versionName = "0.1.9"
         // Overridden to true by the "tv" flavor only. Phone flavors keep the
         // tuned-for-handsets behaviour, byte for byte.
         buildConfigField("boolean", "TV_BUILD", "false")

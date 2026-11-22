@@ -63,5 +63,8 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           files: LokoTube-*.apk
+          # Without this the release body is null and the in-app "What's new"
+          # section renders the word null.
+          generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

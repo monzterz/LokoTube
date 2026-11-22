@@ -1057,6 +1057,7 @@ private fun VersionHistoryContent() {
     // the release list from GitHub and force-closed when its LazyColumn was
     // measured inside the scrolling dialog. A static list cannot crash.
     val entries = listOf(
+        Triple("0.1.9", "22 Nov 2026", "Rincian pembaruan tidak lagi tampil \"null\": catatan rilis diambil dengan benar dari GitHub, dan tiap rilis sekarang membawa catatan perubahan. Isi cadangan di dalam app juga diperbarui."),
         Triple("0.1.8", "22 Nov 2026", "Perbaikan angka di halaman video: jumlah tayangan tidak lagi tampil \"0 kali ditonton\" (diambil dari halaman tonton, bukan baris daftar) dan jumlah subscriber tampil benar (14,8 jt, bukan 14). Metadata diminta dalam format Inggris karena itu yang bisa dibaca mesin YouTube internal, tampilan tetap Indonesia."),
         Triple("0.1.7", "22 Nov 2026", "Perbaikan pemutaran: mesin YouTube internal diperbarui (klien visionOS + web) — video yang tadinya ditolak dengan pesan \"YouTube menolak stream ini\" kembali bisa diputar. Tambah Log pemutaran di Setelan (kirim catatan teknis kalau ada video gagal)."),
         Triple("0.1.6", "12 Nov 2026", "Blokir channel (tekan-tahan video untuk menyembunyikan dari beranda & rekomendasi) dan halaman artis musik: ketuk nama penyanyi untuk membuka daftar lagu & album sang artis."),
