@@ -265,8 +265,11 @@ class PlayerState(private val scope: CoroutineScope) {
     init {
 
         scope.launch {
-            snapshotFlow { StreamRecovery.recovering to StreamRecovery.failed }.collect { (_, failed) ->
+            snapshotFlow { StreamRecovery.recovering to StreamRecovery.failed }.collect { (recovering, failed) ->
                 syncFromPlayer()
+                // Recovery replaces the stream under the same video, so the error overlay
+                // from the failed attempt must not stay on top of a playing video.
+                if (recovering != null) error = null
                 if (failed != null && failed.first == current?.id) {
                     error = failed.second
                     isBuffering = false
@@ -1699,9 +1702,15 @@ class PlayerState(private val scope: CoroutineScope) {
                 "url" to PlaybackLog.describeUrl(httpCause?.dataSpec?.uri?.toString()),
                 "pos" to (controller?.currentPosition?.div(1000)),
                 "firstFrame" to firstFrameRendered,
+                // A generic "couldn't be played" gives no clue about the cause. The
+                // exception class plus a short message is what separates a dead socket
+                // from a decoder the device cannot init.
+                "ex" to e.cause?.javaClass?.simpleName,
+                "msg" to e.cause?.message?.take(120),
+                "kbps" to PlaybackBandwidth.measuredKbps(),
             )
 
-            if (e.errorCode == PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS && StreamRecovery.recovering == current?.id) return
+            if (StreamRecovery.isRecoverable(e.errorCode) && StreamRecovery.recovering == current?.id) return
             error = when (e.errorCode) {
                 PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
                 PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT -> I18n.t("error_no_connection", "Lost the connection. Check your network and try again.")

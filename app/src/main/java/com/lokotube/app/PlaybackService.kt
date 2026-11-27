@@ -262,6 +262,21 @@ object StreamRecovery {
 
     var failed by mutableStateOf<Pair<String, String>?>(null)
         internal set
+
+    /**
+     * Errors worth a second attempt with a freshly extracted stream URL.
+     *
+     * Only HTTP 4xx used to be retried, which meant a dropped socket, a read timeout
+     * or a byte range the host refused killed playback outright even though the video
+     * was perfectly watchable after a re-extract. These are all transient failures of
+     * the *connection*, not of the video, so they go through the same recovery path.
+     * Decoder and parser failures are deliberately absent: re-downloading the same
+     * bytes cannot fix those, they need a different stream or a different decoder.
+     */
+    fun isRecoverable(code: Int): Boolean = code == PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS ||
+        code == PlaybackException.ERROR_CODE_IO_UNSPECIFIED ||
+        code == PlaybackException.ERROR_CODE_TIMEOUT ||
+        code == PlaybackException.ERROR_CODE_IO_READ_POSITION_OUT_OF_RANGE
 }
 
 
@@ -280,25 +295,38 @@ private class StreamRecoverer(
     private val main = Handler(Looper.getMainLooper())
     private var lastId: String? = null
     private var lastPositionMs = 0L
+    private val attempts = HashMap<String, Int>()
 
     override fun onPlayerError(error: PlaybackException) {
-        if (error.errorCode != PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS) return
+        if (!StreamRecovery.isRecoverable(error.errorCode)) return
         val item = player.currentMediaItem ?: return
 
         if (item.localConfiguration?.uri?.scheme == "file") return
         val id = item.mediaId
         val position = player.currentPosition
+        val tries = attempts[id] ?: 0
         if (id == lastId && position < lastPositionMs + PROGRESS_MS) {
-            Log.w("LokoTube", "stream refused again for $id at ${position / 1000}s; giving up")
-            PlaybackLog.event("recover_giveup", id, "pos" to (position / 1000))
+            Log.w("LokoTube", "${error.errorCodeName} again for $id at ${position / 1000}s; giving up")
+            PlaybackLog.event("recover_giveup", id, "pos" to (position / 1000), "code" to error.errorCodeName, "tries" to tries)
             return
         }
+        // Recovery is cheap but not free (a fresh extraction), and a stream that keeps
+        // dying within seconds of resuming is not going to heal. The progress gate above
+        // covers the "same position twice" case, this caps the total per video.
+        if (tries >= MAX_ATTEMPTS) {
+            Log.w("LokoTube", "giving up on $id after $tries recoveries")
+            PlaybackLog.event("recover_giveup", id, "pos" to (position / 1000), "code" to error.errorCodeName, "tries" to tries)
+            return
+        }
+        attempts[id] = tries + 1
         lastId = id
         lastPositionMs = position
-        Log.i("LokoTube", "stream refused for $id; re-extracting and resuming at ${position / 1000}s")
+        Log.i("LokoTube", "${error.errorCodeName} for $id; re-extracting and resuming at ${position / 1000}s")
         PlaybackLog.event(
             "recover_start", id,
             "pos" to (position / 1000),
+            "code" to error.errorCodeName,
+            "try" to (tries + 1),
             "url" to PlaybackLog.describeUrl(
                 (error.cause as? androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException)?.dataSpec?.uri?.toString()
             ),
@@ -314,6 +342,7 @@ private class StreamRecoverer(
                 if (player.currentMediaItem?.mediaId != id || player.playerError == null) return@post
                 result
                     .onSuccess {
+                        attempts.remove(id)
                         PlaybackLog.event("recover_ok", id, "pos" to (position / 1000))
                         resume(item, position)
                     }
@@ -340,6 +369,7 @@ private class StreamRecoverer(
 
     private companion object {
         const val PROGRESS_MS = 30_000L
+        const val MAX_ATTEMPTS = 4
     }
 }
 
