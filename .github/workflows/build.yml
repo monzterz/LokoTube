@@ -55,8 +55,11 @@ jobs:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           echo "$KEYSTORE_FILE_BASE64" | base64 -d > app/release.keystore
-          ./gradlew assembleGithubRelease --no-daemon
+          ./gradlew assembleGithubRelease assembleTvRelease --no-daemon
           cp app/build/outputs/apk/github/release/app-github-release.apk "LokoTube-${GITHUB_REF_NAME#v}.apk"
+          # The TV flavour updates itself now, so every release must carry its own
+          # asset: without it a TV box finds the release but no matching APK.
+          cp app/build/outputs/apk/tv/release/app-tv-release.apk "LokoTubeTV-${GITHUB_REF_NAME#v}-tv.apk"
 
       - name: Pick release notes (tag only)
         if: startsWith(github.ref, 'refs/tags/')
@@ -73,7 +76,9 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v3
         with:
-          files: LokoTube-*.apk
+          files: |
+            LokoTube-*.apk
+            LokoTubeTV-*.apk
           # A release without a body comes back as JSON null and the in-app
           # "What's new" section used to print the word null, so always send one.
           body_path: release-body.md

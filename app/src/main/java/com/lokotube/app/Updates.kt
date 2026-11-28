@@ -165,9 +165,9 @@ private fun JSONObject.releaseBody(): String {
 }
 
 internal val RELEASE_NOTES = """
+    • Build TV/proyektor kini memperbarui dirinya sendiri dari rilis GitHub (hanya mengambil APK TV).
     • Pemutaran lebih tahan gangguan jaringan: putus koneksi, timeout, atau permintaan byte yang ditolak dicoba ulang dengan tautan stream baru lalu lanjut dari posisi terakhir (maksimal 4 kali).
-    • Log pemutaran kini mencatat jenis kegagalan + kecepatan unduhan, jadi laporan bug lebih cepat ditelusuri.
-    • Panel error hilang begitu pemutaran pulih, tidak menutupi video yang sudah jalan.
+    • Log pemutaran mencatat jenis kegagalan + kecepatan unduhan, jadi laporan bug lebih cepat ditelusuri.
     • Putar YouTube & YouTube Music tanpa iklan, unduhan sampai 4K HDR, pemutaran latar, PiP, dan mode Android TV.
 """.trimIndent()
 
@@ -255,6 +255,17 @@ class UpdateState(private val scope: CoroutineScope) {
                         Uri.parse("package:${context.packageName}"),
                     ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
                 )
+            }.onFailure {
+                // Many TV boxes ship without the per-app "install unknown apps" screen;
+                // the app's own details page is the closest thing they do have.
+                if (BuildConfig.TV_BUILD) runCatching {
+                    context.startActivity(
+                        Intent(
+                            Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                            Uri.parse("package:${context.packageName}"),
+                        ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                    )
+                }
             }
             return
         }
@@ -288,12 +299,18 @@ class UpdateState(private val scope: CoroutineScope) {
             val version = tag.removePrefix("v").removePrefix("V").trim()
             if (version.isBlank()) return null
             val assets = json.optJSONArray("assets") ?: return null
+            // The TV flavour is a different package (com.lokotube.app.tv). Handing it
+            // the phone APK would not update this app — the system would install a
+            // second, separate app — so each build only accepts its own asset:
+            // phone builds skip *TV* assets, TV builds take nothing but them.
+            val tvBuild = BuildConfig.TV_BUILD
             var apkUrl: String? = null
             var size = 0L
             for (i in 0 until assets.length()) {
                 val asset = assets.optJSONObject(i) ?: continue
                 val name = asset.optString("name")
                 if (!name.endsWith(".apk", ignoreCase = true)) continue
+                if (name.startsWith("LokoTubeTV", ignoreCase = true) != tvBuild) continue
                 val candidate = asset.optString("browser_download_url")
                 if (candidate.isBlank()) continue
                 if (apkUrl == null || name.equals("LokoTube.apk", ignoreCase = true)) {

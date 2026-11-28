@@ -13,8 +13,8 @@ android {
         applicationId = "com.lokotube.app"
         minSdk = 24
         targetSdk = 36
-        versionCode = 11
-        versionName = "0.2.0"
+        versionCode = 12
+        versionName = "0.2.1"
         // Overridden to true by the "tv" flavor only. Phone flavors keep the
         // tuned-for-handsets behaviour, byte for byte.
         buildConfigField("boolean", "TV_BUILD", "false")
@@ -36,7 +36,9 @@ android {
             dimension = "channel"
             applicationIdSuffix = ".tv"
             versionNameSuffix = "-tv"
-            buildConfigField("boolean", "UPDATES_ENABLED", "false")
+            // TV boxes are rarely within adb reach, so this flavour updates itself
+            // from the same GitHub release — but only from the *TV* asset.
+            buildConfigField("boolean", "UPDATES_ENABLED", "true")
             buildConfigField("boolean", "TV_BUILD", "true")
         }
     }

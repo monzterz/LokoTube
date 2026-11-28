@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- TV boxes are practically never within adb reach, so this flavour keeps the
+         in-app updater (UPDATES_ENABLED=true) and therefore needs the install
+         permission. The fdroid flavour stays clean; the github flavour has its own
+         copy of this permission. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+</manifest>
