@@ -165,9 +165,9 @@ private fun JSONObject.releaseBody(): String {
 }
 
 internal val RELEASE_NOTES = """
-    • Pemutaran diperbaiki: mesin YouTube internal memakai klien visionOS, jadi video yang tadinya ditolak ("YouTube menolak stream ini") bisa diputar lagi.
-    • Angka di halaman video sudah benar: jumlah tayangan tidak lagi 0 dan jumlah subscriber tidak lagi terpotong.
-    • Log pemutaran di Setelan untuk mengirim catatan kalau ada video yang gagal.
+    • Pemutaran lebih tahan gangguan jaringan: putus koneksi, timeout, atau permintaan byte yang ditolak dicoba ulang dengan tautan stream baru lalu lanjut dari posisi terakhir (maksimal 4 kali).
+    • Log pemutaran kini mencatat jenis kegagalan + kecepatan unduhan, jadi laporan bug lebih cepat ditelusuri.
+    • Panel error hilang begitu pemutaran pulih, tidak menutupi video yang sudah jalan.
     • Putar YouTube & YouTube Music tanpa iklan, unduhan sampai 4K HDR, pemutaran latar, PiP, dan mode Android TV.
 """.trimIndent()
 
